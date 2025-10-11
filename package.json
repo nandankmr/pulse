@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "test": "jest",
     "build:android": "npx react-native run-android --variant=release",
-    "build:ios": "npx react-native run-ios --configuration=Release"
+    "build:ios": "npx react-native run-ios --configuration=Release",
+    "start": "react-native start"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
