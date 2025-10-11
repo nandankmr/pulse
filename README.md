@@ -1,76 +1,171 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Pulse - React Native App
 
-# Getting Started
+A production-grade React Native application with TypeScript, Redux Toolkit, React Navigation, and modern best practices.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Setup Instructions
 
-## Step 1: Start Metro
+### Prerequisites
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- Node.js >= 20
+- React Native CLI
+- Android Studio (for Android)
+- Xcode (for iOS)
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+### Installation
 
-```sh
-# Using npm
-npm start
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd pulse
+   ```
 
-# OR using Yarn
-yarn start
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. For iOS (macOS only):
+   ```bash
+   npx pod-install ios
+   ```
+
+4. For Android:
+   ```bash
+   # Ensure Android emulator is running or device is connected
+   ```
+
+## Folder Structure
+
+```
+pulse/
+├── android/                 # Android native code
+├── ios/                     # iOS native code
+├── src/                     # Source code
+│   ├── api/                 # API related code
+│   ├── assets/              # Images, fonts, etc.
+│   ├── components/          # Reusable components
+│   ├── constants/           # App constants
+│   ├── hooks/               # Custom hooks
+│   ├── navigation/          # Navigation setup
+│   ├── screens/             # Screen components
+│   ├── store/               # Redux store and slices
+│   ├── theme/               # Theming and UI tokens
+│   ├── types/               # TypeScript type definitions
+│   ├── utils/               # Utility functions
+│   └── App.tsx              # Main app component
+├── .env                     # Environment variables (ignored in Git)
+├── .github/workflows/       # CI/CD configuration
+├── .husky/                  # Git hooks
+├── __tests__/               # Test files
+├── .editorconfig            # Editor configuration
+├── .eslintrc.js             # ESLint configuration
+├── .prettierrc              # Prettier configuration
+├── tsconfig.json            # TypeScript configuration
+├── package.json             # Dependencies and scripts
+└── README.md                # This file
 ```
 
-## Step 2: Build and run your app
+## Commands
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+### Development
 
-### Android
+- Start Metro bundler:
+  ```bash
+  npm start
+  ```
 
-```sh
-# Using npm
-npm run android
+- Run on Android:
+  ```bash
+  npm run android
+  ```
 
-# OR using Yarn
-yarn android
+- Run on iOS:
+  ```bash
+  npm run ios
+  ```
+
+- Run tests:
+  ```bash
+  npm test
+  ```
+
+- Run lint:
+  ```bash
+  npm run lint
+  ```
+
+### Building
+
+- Build for Android:
+  ```bash
+  npx react-native run-android --variant=release
+  ```
+
+- Build for iOS:
+  ```bash
+  npx react-native run-ios --configuration=Release
+  ```
+
+## Adding New Features
+
+### Adding New Screens
+
+1. Create a new screen in `src/screens/` (e.g., `NewScreen.tsx`).
+2. Add the screen to `src/navigation/AppNavigator.tsx` in the Stack.Navigator.
+3. Update navigation types if needed.
+
+### Adding New Redux Slices
+
+1. Create a new slice in `src/store/` (e.g., `newSlice.ts`).
+2. Add the reducer to `src/store/index.ts`.
+3. Use the slice in components with `useSelector` and `useDispatch`.
+
+### Adding New Navigation Routes
+
+1. Import the new screen in `AppNavigator.tsx`.
+2. Add a new Stack.Screen in the Stack.Navigator.
+
+## Quality Gates
+
+The project includes automated quality checks:
+
+- **Linting**: ESLint with Airbnb/React Native rules
+- **Formatting**: Prettier
+- **Type Checking**: TypeScript strict mode
+- **Testing**: Jest with React Native Testing Library
+- **Pre-commit Hooks**: Runs lint, format, and tests before commits
+- **CI/CD**: GitHub Actions for automated checks on PRs
+
+## Environment Variables
+
+The app uses `react-native-config` for environment variables.
+
+Create a `.env` file (already ignored in Git) with:
+
+```
+API_URL=https://api.example.com
+ENV=development
 ```
 
-### iOS
+Access in code with:
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+```ts
+import Config from 'react-native-config';
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+const apiUrl = Config.API_URL;
 ```
 
-Then, and every time you update your native dependencies, run:
+## Contributing
 
-```sh
-bundle exec pod install
-```
+1. Create a feature branch.
+2. Make your changes.
+3. Run `npm test` and `npm run lint`.
+4. Commit with conventional commit messages.
+5. Push and create a PR.
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## License
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
+This project is licensed under the MIT License."Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
 - **iOS**: Press <kbd>R</kbd> in iOS Simulator.
 
 ## Congratulations! :tada:
