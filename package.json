@@ -3,12 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android"      : "react-native run-android",
+    "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest",
-    "prepare": "husky"
+    "build:android": "npx react-native run-android --variant=release",
+    "build:ios": "npx react-native run-ios --configuration=Release"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
