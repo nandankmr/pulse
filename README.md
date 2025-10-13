@@ -1,10 +1,37 @@
-# Pulse - React Native App
+# Pulse - Real-time Messaging App
 
-A production-grade React Native application with TypeScript, Redux Toolkit, React Navigation, and modern best practices.
+A modern, feature-rich real-time messaging application built with React Native, TypeScript, and Socket.io.
 
-## Setup Instructions
+## Features
+
+- 🔐 **Authentication** - Email/password login, registration, email verification
+- 👤 **Profile Management** - Edit profile, avatar upload, theme toggle
+- 💬 **Real-time Messaging** - Instant messaging with Socket.io
+- 📱 **Chat Management** - Chat list, search, unread badges
+- 📎 **Rich Attachments** - Images, videos, location sharing
+- 👥 **Group Management** - Create groups, add/remove members, role management
+- 🌓 **Dark Mode** - Light/dark theme support
+- ✅ **Read Receipts** - Message delivery status
+- 🔔 **Typing Indicators** - See when others are typing
+- 📍 **Location Sharing** - Share your current location
+
+## Tech Stack
+
+- **React Native 0.82.0** - Cross-platform mobile framework
+- **TypeScript** - Type-safe development
+- **Redux Toolkit** - State management
+- **React Navigation** - Navigation library
+- **React Native Paper** - Material Design components
+- **Socket.io Client** - Real-time communication
+- **Axios** - HTTP client
+- **@react-native-community/geolocation** - Location services
+- **react-native-image-picker** - Camera and gallery access
+
+## Quick Start
 
 ### Prerequisites
+- Node.js 18+ (Note: Project uses Node 18, but React Native 0.82 recommends Node 20+)
+- npm or yarn
 
 - Node.js >= 20
 - React Native CLI

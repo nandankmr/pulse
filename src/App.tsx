@@ -5,7 +5,7 @@
  * @format
  */
 
-import { StatusBar, useColorScheme } from 'react-native';
+import { StatusBar, useColorScheme, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { I18nextProvider } from 'react-i18next';
@@ -20,8 +20,36 @@ import {
 import { ThemeProvider } from './theme/ThemeContext';
 import { colors } from './theme';
 import AppNavigator from './navigation/AppNavigator';
+import { useAuthRestore } from './hooks/useAuthRestore';
 
 const queryClient = new QueryClient();
+
+function AppContent() {
+  const { isRestoring } = useAuthRestore();
+  const isDarkMode = useColorScheme() === 'dark';
+
+  if (isRestoring) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: isDarkMode ? '#121212' : '#FFFFFF',
+        }}
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <AppNavigator />
+    </>
+  );
+}
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -39,10 +67,7 @@ function App() {
           <PaperProvider theme={paperTheme}>
             <Provider store={store}>
               <SafeAreaProvider>
-                <StatusBar
-                  barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                />
-                <AppNavigator />
+                <AppContent />
               </SafeAreaProvider>
             </Provider>
           </PaperProvider>

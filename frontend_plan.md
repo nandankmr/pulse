@@ -17,10 +17,12 @@ Since we already have the basic project scaffolded (navigation, state management
 
 ### Step 1.2: Implement Email Verification UI
 - Add email verification screen `src/screens/EmailVerificationScreen.tsx`.
-- Show verification status and resend option.
-- Integrate with backend endpoint for resending verification.
+- 6-digit OTP input with auto-focus and auto-submit functionality.
+- Verify OTP and automatically log in user upon successful verification.
+- Resend OTP option with cooldown timer.
+- Integrate with backend endpoints for OTP verification and resend.
 
-**Backend requirement**: Endpoint for resending email verification.
+**Backend requirement**: POST /auth/verify-otp and POST /auth/resend-otp endpoints.
 
 ## Phase 2: State Management & Data Fetching
 
