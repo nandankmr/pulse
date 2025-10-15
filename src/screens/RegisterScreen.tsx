@@ -5,10 +5,13 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 're
 import { TextInput, Button, Text, HelperText } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
+import { useRegister } from '../hooks/useAuth';
+import { isApiError } from '../types/api';
 
 const RegisterScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
+  const registerMutation = useRegister();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -16,7 +19,6 @@ const RegisterScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateEmail = (email: string) => {
@@ -63,25 +65,15 @@ const RegisterScreen: React.FC = () => {
       return;
     }
 
-    setLoading(true);
-    
     try {
-      // TODO: Replace with actual API call
-      // const response = await registerAPI({ name, email, password });
-      // Navigate to email verification screen
-      // navigation.navigate('EmailVerification', { email });
-      
-      // Mock delay for demonstration
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000));
-      
-      console.log('Register attempt:', { name, email });
-      
-      // For now, navigate to login
-      navigation.navigate('Login' as never);
-    } catch (err: any) {
-      setErrors({ general: err.message || 'Registration failed. Please try again.' });
-    } finally {
-      setLoading(false);
+      await registerMutation.mutateAsync({ name, email, password });
+      // After successful registration, navigate to email verification
+      navigation.navigate('EmailVerification' as never, { email } as never);
+    } catch (err) {
+      const errorMessage = isApiError(err) 
+        ? err.message 
+        : 'Registration failed. Please try again.';
+      setErrors({ general: errorMessage });
     }
   };
 
@@ -214,8 +206,8 @@ const RegisterScreen: React.FC = () => {
           <Button
             mode="contained"
             onPress={handleRegister}
-            loading={loading}
-            disabled={loading}
+            loading={registerMutation.isPending}
+            disabled={registerMutation.isPending}
             style={styles.button}
           >
             Create Account
@@ -228,7 +220,7 @@ const RegisterScreen: React.FC = () => {
             <Button
               mode="text"
               onPress={navigateToLogin}
-              disabled={loading}
+              disabled={registerMutation.isPending}
               compact
             >
               Sign In

@@ -2,182 +2,213 @@
 
 import apiClient from './client';
 
-export interface CreateGroupRequest {
-  name: string;
-  description?: string;
-  avatar?: string;
-  isPrivate: boolean;
-  memberIds: string[];
-}
+// ============= Types matching backend API =============
 
-export interface CreateGroupResponse {
-  group: Group;
+export type GroupRole = 'ADMIN' | 'MEMBER';
+
+export interface GroupMember {
+  userId: string;
+  role: GroupRole;
+  joinedAt: string;
 }
 
 export interface Group {
   id: string;
   name: string;
-  description?: string;
-  avatar?: string;
-  isPrivate: boolean;
+  description: string | null;
+  avatarUrl: string | null;
   createdBy: string;
-  memberCount: number;
   createdAt: string;
   updatedAt: string;
+  members: GroupMember[];
 }
 
-export interface GroupMember {
+export interface GroupInvitation {
   id: string;
-  userId: string;
   groupId: string;
-  role: 'admin' | 'member';
-  joinedAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-    isOnline: boolean;
-  };
+  inviterId: string;
+  token: string;
+  inviteeEmail: string | null;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+}
+
+// ============= Request/Response Types =============
+
+export interface CreateGroupRequest {
+  name: string;
+  description?: string;
+  avatarUrl?: string;
+}
+
+export interface UpdateGroupRequest {
+  name?: string;
+  description?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface AddMemberRequest {
+  userId: string;
+  role?: GroupRole;
+}
+
+export interface UpdateMemberRoleRequest {
+  role: GroupRole;
+}
+
+export interface CreateInvitationRequest {
+  email?: string;
+  expiresInHours?: number;
+}
+
+export interface JoinGroupRequest {
+  token: string;
 }
 
 export interface GetGroupsResponse {
-  groups: Group[];
-}
-
-export interface GetGroupMembersResponse {
-  members: GroupMember[];
+  data: Group[];
 }
 
 /**
  * Create a new group
+ * POST /api/groups
  */
 export const createGroupAPI = async (
   data: CreateGroupRequest
-): Promise<CreateGroupResponse> => {
-  const response = await apiClient.post<CreateGroupResponse>('/groups', data);
+): Promise<Group> => {
+  const response = await apiClient.post<Group>('/groups', data);
   return response.data;
 };
 
 /**
  * Get all groups for current user
+ * GET /api/groups/me
  */
-export const getGroupsAPI = async (): Promise<GetGroupsResponse> => {
-  const response = await apiClient.get<GetGroupsResponse>('/groups');
+export const getMyGroupsAPI = async (): Promise<GetGroupsResponse> => {
+  const response = await apiClient.get<GetGroupsResponse>('/groups/me');
   return response.data;
 };
 
 /**
  * Get group by ID
+ * GET /api/groups/:groupId
  */
-export const getGroupByIdAPI = async (groupId: string): Promise<Group> => {
+export const getGroupAPI = async (groupId: string): Promise<Group> => {
   const response = await apiClient.get<Group>(`/groups/${groupId}`);
   return response.data;
 };
 
 /**
  * Update group info
+ * PATCH /api/groups/:groupId
  */
 export const updateGroupAPI = async (
   groupId: string,
-  data: Partial<CreateGroupRequest>
+  data: UpdateGroupRequest
 ): Promise<Group> => {
-  const response = await apiClient.put<Group>(`/groups/${groupId}`, data);
+  const response = await apiClient.patch<Group>(`/groups/${groupId}`, data);
   return response.data;
 };
 
 /**
  * Delete group
+ * DELETE /api/groups/:groupId
  */
 export const deleteGroupAPI = async (groupId: string): Promise<void> => {
   await apiClient.delete(`/groups/${groupId}`);
 };
 
 /**
- * Get group members
+ * Add member to group
+ * POST /api/groups/:groupId/members
  */
-export const getGroupMembersAPI = async (
-  groupId: string
-): Promise<GetGroupMembersResponse> => {
-  const response = await apiClient.get<GetGroupMembersResponse>(
-    `/groups/${groupId}/members`
+export const addGroupMemberAPI = async (
+  groupId: string,
+  data: AddMemberRequest
+): Promise<Group> => {
+  const response = await apiClient.post<Group>(`/groups/${groupId}/members`, data);
+  return response.data;
+};
+
+/**
+ * Update member role
+ * PATCH /api/groups/:groupId/members/:userId
+ */
+export const updateMemberRoleAPI = async (
+  groupId: string,
+  userId: string,
+  data: UpdateMemberRoleRequest
+): Promise<Group> => {
+  const response = await apiClient.patch<Group>(
+    `/groups/${groupId}/members/${userId}`,
+    data
   );
   return response.data;
 };
 
 /**
- * Add members to group
- */
-export const addGroupMembersAPI = async (
-  groupId: string,
-  userIds: string[]
-): Promise<void> => {
-  await apiClient.post(`/groups/${groupId}/members`, { userIds });
-};
-
-/**
  * Remove member from group
+ * DELETE /api/groups/:groupId/members/:userId
  */
-export const removeMemberAPI = async (
+export const removeGroupMemberAPI = async (
   groupId: string,
   userId: string
-): Promise<void> => {
-  await apiClient.delete(`/groups/${groupId}/members/${userId}`);
-};
-
-/**
- * Update member role
- */
-export const updateMemberRoleAPI = async (
-  groupId: string,
-  userId: string,
-  role: 'admin' | 'member'
-): Promise<void> => {
-  await apiClient.put(`/groups/${groupId}/members/${userId}`, { role });
-};
-
-/**
- * Join a group (for public groups)
- */
-export const joinGroupAPI = async (groupId: string): Promise<void> => {
-  await apiClient.post(`/groups/${groupId}/join`);
-};
-
-/**
- * Leave a group
- */
-export const leaveGroupAPI = async (groupId: string): Promise<void> => {
-  await apiClient.post(`/groups/${groupId}/leave`);
-};
-
-/**
- * Invite users to group
- */
-export const inviteToGroupAPI = async (
-  groupId: string,
-  userIds: string[]
-): Promise<void> => {
-  await apiClient.post(`/groups/${groupId}/invite`, { userIds });
-};
-
-/**
- * Search users (for adding to groups)
- */
-export interface SearchUsersResponse {
-  users: Array<{
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-    isOnline: boolean;
-  }>;
-}
-
-export const searchUsersAPI = async (
-  query: string
-): Promise<SearchUsersResponse> => {
-  const response = await apiClient.get<SearchUsersResponse>('/users/search', {
-    params: { q: query },
-  });
+): Promise<Group> => {
+  const response = await apiClient.delete<Group>(
+    `/groups/${groupId}/members/${userId}`
+  );
   return response.data;
+};
+
+/**
+ * Create invitation
+ * POST /api/groups/:groupId/invite
+ */
+export const createInvitationAPI = async (
+  groupId: string,
+  data: CreateInvitationRequest
+): Promise<GroupInvitation> => {
+  const response = await apiClient.post<GroupInvitation>(
+    `/groups/${groupId}/invite`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * Join group with invitation token
+ * POST /api/groups/:groupId/join
+ */
+export const joinGroupAPI = async (
+  groupId: string,
+  data: JoinGroupRequest
+): Promise<Group> => {
+  const response = await apiClient.post<Group>(`/groups/${groupId}/join`, data);
+  return response.data;
+};
+
+// ============= Helper Functions =============
+
+/**
+ * Check if user is admin in group
+ */
+export const isGroupAdmin = (group: Group, userId: string): boolean => {
+  const member = group.members.find(m => m.userId === userId);
+  return member?.role === 'ADMIN';
+};
+
+/**
+ * Get user's role in group
+ */
+export const getUserRole = (group: Group, userId: string): GroupRole | null => {
+  const member = group.members.find(m => m.userId === userId);
+  return member?.role || null;
+};
+
+/**
+ * Check if user is member of group
+ */
+export const isGroupMember = (group: Group, userId: string): boolean => {
+  return group.members.some(m => m.userId === userId);
 };

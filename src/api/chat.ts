@@ -11,6 +11,7 @@ export interface ChatResponse {
   unreadCount: number;
   isGroup: boolean;
   isOnline?: boolean;
+  otherUserId?: string; // For DM conversations, the ID of the other user
 }
 
 export interface GetChatsResponse {
@@ -25,6 +26,49 @@ export interface CreateChatRequest {
 
 export interface CreateChatResponse {
   chat: ChatResponse;
+}
+
+export interface UserSearchResult {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  verified: boolean;
+}
+
+export interface SearchUsersResponse {
+  data: UserSearchResult[];
+}
+
+export interface GroupMember {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role: 'ADMIN' | 'MEMBER';
+  joinedAt: string;
+  isOnline: boolean;
+}
+
+export interface GetGroupMembersResponse {
+  members: GroupMember[];
+}
+
+export interface UpdateGroupDetailsRequest {
+  name?: string;
+  description?: string;
+  avatar?: string;
+}
+
+export interface UpdateGroupDetailsResponse {
+  id: string;
+  name: string;
+  description?: string;
+  avatar?: string;
+}
+
+export interface UpdateMemberRoleRequest {
+  role: 'ADMIN' | 'MEMBER';
 }
 
 /**
@@ -92,4 +136,47 @@ export const removeGroupMemberAPI = async (
   memberId: string
 ): Promise<void> => {
   await apiClient.delete(`/chats/${chatId}/members/${memberId}`);
+};
+
+// Note: searchUsersAPI is now in user.ts to avoid duplication
+
+/**
+ * Get group members with full details
+ */
+export const getGroupMembersAPI = async (
+  chatId: string
+): Promise<GetGroupMembersResponse> => {
+  const response = await apiClient.get<GetGroupMembersResponse>(
+    `/chats/${chatId}/members`
+  );
+  return response.data;
+};
+
+/**
+ * Update group details (name, description, avatar)
+ */
+export const updateGroupDetailsAPI = async (
+  chatId: string,
+  data: UpdateGroupDetailsRequest
+): Promise<UpdateGroupDetailsResponse> => {
+  const response = await apiClient.patch<UpdateGroupDetailsResponse>(
+    `/chats/${chatId}`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * Promote or demote group member
+ */
+export const updateMemberRoleAPI = async (
+  chatId: string,
+  memberId: string,
+  data: UpdateMemberRoleRequest
+): Promise<{ message: string }> => {
+  const response = await apiClient.patch<{ message: string }>(
+    `/chats/${chatId}/members/${memberId}`,
+    data
+  );
+  return response.data;
 };

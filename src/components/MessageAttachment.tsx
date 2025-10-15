@@ -6,6 +6,7 @@ import { Text, IconButton } from 'react-native-paper';
 import { Attachment } from '../types/message';
 import { formatFileSize, formatDuration } from '../utils/attachmentUpload';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import LocationPreview from './LocationPreview';
 
 interface MessageAttachmentProps {
   attachment: Attachment;
@@ -91,21 +92,19 @@ const MessageAttachment: React.FC<MessageAttachmentProps> = ({ attachment, onPre
     </TouchableOpacity>
   );
 
-  const renderLocationAttachment = () => (
-    <TouchableOpacity onPress={handlePress} activeOpacity={0.8} style={styles.locationContainer}>
-      <View style={styles.locationMap}>
-        <Icon name="map-marker" size={48} color="#F44336" />
-      </View>
-      <View style={styles.locationInfo}>
-        <Text variant="bodyMedium">📍 Location</Text>
-        {attachment.latitude && attachment.longitude && (
-          <Text variant="bodySmall" style={styles.coordinates}>
-            {attachment.latitude.toFixed(6)}, {attachment.longitude.toFixed(6)}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+  const renderLocationAttachment = () => {
+    if (!attachment.latitude || !attachment.longitude) {
+      return null;
+    }
+    
+    return (
+      <LocationPreview
+        latitude={attachment.latitude}
+        longitude={attachment.longitude}
+        onPress={onPress}
+      />
+    );
+  };
 
   switch (attachment.type) {
     case 'image':

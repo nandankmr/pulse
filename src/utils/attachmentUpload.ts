@@ -2,6 +2,8 @@
 
 import { Attachment } from '../types/message';
 import { PickedAttachment } from './attachmentPicker';
+import config from '../config';
+import { store } from '../store';
 
 export interface UploadProgress {
   loaded: number;
@@ -16,65 +18,73 @@ export interface PresignedUrlResponse {
 }
 
 /**
- * Get presigned URL for upload
+ * Upload file directly to backend
  */
-export const getPresignedUploadUrl = async (
+export const uploadFileToBackend = async (
+  fileUri: string,
   fileName: string,
   fileType: string,
-  attachmentType: 'image' | 'video' | 'audio' | 'file'
-): Promise<PresignedUrlResponse> => {
-  // TODO: Replace with actual API call
-  // const response = await apiClient.post('/attachments/upload-url', {
-  //   fileName,
-  //   fileType,
-  //   attachmentType,
-  // });
-  // return response.data;
-
-  // Mock response
-  await new Promise<void>((resolve) => setTimeout(() => resolve(), 500));
-  
-  return {
-    uploadUrl: `https://mock-s3.amazonaws.com/upload/${fileName}`,
-    fileUrl: `https://mock-cdn.com/attachments/${fileName}`,
-  };
-};
-
-/**
- * Upload file to S3 or storage service
- */
-export const uploadToStorage = async (
-  presignedUrl: string,
-  fileUri: string,
-  fileType: string,
   onProgress?: (progress: UploadProgress) => void
-): Promise<void> => {
-  // TODO: Implement actual file upload
-  // For React Native, you might use:
-  // - fetch with FormData
-  // - react-native-fs
-  // - expo-file-system
+): Promise<string> => {
+  console.log('📤 Starting file upload:', { fileUri, fileName, fileType });
+  
+  // Get auth token
+  const state = store.getState();
+  const token = state.auth.accessToken;
+  
+  if (!token) {
+    throw new Error('No authentication token');
+  }
+  
+  // Create FormData for React Native
+  const formData = new FormData();
+  
+  // For React Native, we need to format the file properly
+  formData.append('file', {
+    uri: fileUri,
+    type: fileType,
+    name: fileName,
+  } as any);
+  
+  const uploadUrl = `${config.API_URL}/attachments/upload`;
+  console.log('📦 Uploading to:', uploadUrl);
 
-  // Mock upload with progress
-  return new Promise<void>((resolve) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 20;
-      
-      if (onProgress) {
-        onProgress({
-          loaded: progress,
-          total: 100,
-          percentage: progress,
-        });
-      }
+  try {
+    // Use fetch instead of axios for better React Native compatibility
+    // IMPORTANT: Don't set Content-Type header - let fetch set it with boundary
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        // Don't set Content-Type - FormData will set it automatically with boundary
+      },
+      body: formData,
+    });
 
-      if (progress >= 100) {
-        clearInterval(interval);
-        resolve();
-      }
-    }, 200);
-  });
+    console.log('📡 Response status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Upload failed:', errorData);
+      throw new Error(errorData.error || errorData.message || 'Failed to upload file');
+    }
+
+    const data = await response.json();
+    console.log('✅ Upload successful:', data);
+
+    // Return the full URL
+    const baseUrl = config.API_URL.replace('/api', '');
+    const fullUrl = `${baseUrl}${data.url}`;
+    console.log('🔗 Full file URL:', fullUrl);
+    
+    return fullUrl;
+  } catch (error: any) {
+    console.error('❌ File upload error:', {
+      message: error.message,
+      stack: error.stack,
+    });
+    throw new Error(error.message || 'Failed to upload file');
+  }
 };
 
 /**
@@ -84,17 +94,10 @@ export const uploadAttachment = async (
   pickedAttachment: PickedAttachment,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<Attachment> => {
-  // Get presigned URL
-  const { uploadUrl, fileUrl } = await getPresignedUploadUrl(
-    pickedAttachment.name,
-    getMimeType(pickedAttachment.type),
-    pickedAttachment.type
-  );
-
-  // Upload file
-  await uploadToStorage(
-    uploadUrl,
+  // Upload file to backend
+  const fileUrl = await uploadFileToBackend(
     pickedAttachment.uri,
+    pickedAttachment.name,
     getMimeType(pickedAttachment.type),
     onProgress
   );

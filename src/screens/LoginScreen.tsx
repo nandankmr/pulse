@@ -5,16 +5,17 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 're
 import { TextInput, Button, Text, HelperText } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
+import { useLogin } from '../hooks/useAuth';
+import { ApiError, isApiError } from '../types/api';
 
 const LoginScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
+  const loginMutation = useLogin();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,41 +23,37 @@ const LoginScreen: React.FC = () => {
   };
 
   const handleLogin = async () => {
-    setError('');
-    
     if (!email || !password) {
-      setError('Please fill in all fields');
       return;
     }
 
     if (!validateEmail(email)) {
-      setError('Please enter a valid email address');
       return;
     }
 
-    setLoading(true);
-    
     try {
-      // TODO: Replace with actual API call
-      // const response = await loginAPI({ email, password });
-      // dispatch(setAuth(response.data));
-      
-      // Mock delay for demonstration
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000));
-      
-      // Navigate to home on success
-      // navigation.navigate('Home');
-      
-      console.log('Login attempt:', { email });
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
+      await loginMutation.mutateAsync({ email, password });
+      // Navigation will happen automatically after successful login
+      // The user will be redirected to the home screen by the navigation logic
+    } catch (err) {
+      // Check if error is due to unverified email
+      const apiError = err as ApiError;
+      if (apiError?.data?.code === 'EMAIL_NOT_VERIFIED') {
+        // Navigate to email verification screen with user's email
+        (navigation as any).navigate('EmailVerification', { email: apiError.data.email });
+      } else {
+        // Other errors are handled by the mutation
+        console.error('Login error:', err);
+      }
     }
   };
 
   const navigateToRegister = () => {
     navigation.navigate('Register' as never);
+  };
+
+  const navigateToForgotPassword = () => {
+    navigation.navigate('ForgotPassword' as never);
   };
 
   return (
@@ -85,7 +82,7 @@ const LoginScreen: React.FC = () => {
             autoCapitalize="none"
             autoComplete="email"
             style={styles.input}
-            error={!!error && !validateEmail(email) && email.length > 0}
+            error={loginMutation.isError && !validateEmail(email) && email.length > 0}
           />
 
           <TextInput
@@ -105,20 +102,37 @@ const LoginScreen: React.FC = () => {
             }
           />
 
-          {error ? (
-            <HelperText type="error" visible={!!error} style={styles.errorText}>
-              {error}
+          {loginMutation.isError ? (
+            <HelperText type="error" visible={loginMutation.isError} style={styles.errorText}>
+              {(() => {
+                console.log('🔴 Login error object:', loginMutation.error);
+                console.log('🔴 Is ApiError?', isApiError(loginMutation.error));
+                if (isApiError(loginMutation.error)) {
+                  console.log('🔴 Error message:', loginMutation.error.message);
+                  return loginMutation.error.message;
+                }
+                return 'Login failed. Please try again.';
+              })()}
             </HelperText>
           ) : null}
 
           <Button
             mode="contained"
             onPress={handleLogin}
-            loading={loading}
-            disabled={loading}
+            loading={loginMutation.isPending}
+            disabled={loginMutation.isPending}
             style={styles.button}
           >
             Sign In
+          </Button>
+
+          <Button
+            mode="text"
+            onPress={navigateToForgotPassword}
+            disabled={loginMutation.isPending}
+            style={styles.forgotButton}
+          >
+            Forgot Password?
           </Button>
 
           <View style={styles.registerContainer}>
@@ -128,7 +142,7 @@ const LoginScreen: React.FC = () => {
             <Button
               mode="text"
               onPress={navigateToRegister}
-              disabled={loading}
+              disabled={loginMutation.isPending}
               compact
             >
               Sign Up
@@ -165,6 +179,9 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 8,
     paddingVertical: 6,
+  },
+  forgotButton: {
+    marginTop: 8,
   },
   errorText: {
     marginTop: -8,

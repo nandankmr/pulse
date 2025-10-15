@@ -11,9 +11,13 @@ export interface GetMessagesResponse {
 
 export interface SendMessageRequest {
   chatId: string;
-  content: string;
-  attachments?: Attachment[];
-  replyTo?: string;
+  content?: string;
+  mediaUrl?: string;
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'LOCATION';
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export interface SendMessageResponse {
@@ -45,9 +49,11 @@ export const getMessagesAPI = async (
 export const sendMessageAPI = async (
   data: SendMessageRequest
 ): Promise<SendMessageResponse> => {
+  // Extract chatId and send the rest as body
+  const { chatId, ...body } = data;
   const response = await apiClient.post<SendMessageResponse>(
-    `/chats/${data.chatId}/messages`,
-    data
+    `/chats/${chatId}/messages`,
+    body
   );
   return response.data;
 };
@@ -85,27 +91,4 @@ export const markMessagesAsReadAPI = async (
   messageIds: string[]
 ): Promise<void> => {
   await apiClient.post(`/chats/${chatId}/messages/read`, { messageIds });
-};
-
-/**
- * React to a message
- */
-export const reactToMessageAPI = async (
-  chatId: string,
-  messageId: string,
-  emoji: string
-): Promise<void> => {
-  await apiClient.post(`/chats/${chatId}/messages/${messageId}/react`, {
-    emoji,
-  });
-};
-
-/**
- * Remove reaction from a message
- */
-export const removeReactionAPI = async (
-  chatId: string,
-  messageId: string
-): Promise<void> => {
-  await apiClient.delete(`/chats/${chatId}/messages/${messageId}/react`);
 };

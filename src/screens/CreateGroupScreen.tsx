@@ -25,18 +25,24 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useCreateChat } from '../hooks/useChats';
+import { useUserSearch } from '../hooks/useUserSearch';
+import config from '../config';
 
 interface User {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
-  isOnline: boolean;
+  avatarUrl: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const CreateGroupScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
+  const createChatMutation = useCreateChat();
 
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -44,42 +50,25 @@ const CreateGroupScreen: React.FC = () => {
   const [isPrivate, setIsPrivate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<User[]>([]);
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [creating, setCreating] = useState(false);
 
-  // Mock users for search
-  const mockUsers: User[] = [
-    { id: '1', name: 'Alice Johnson', email: 'alice@example.com', isOnline: true },
-    { id: '2', name: 'Bob Smith', email: 'bob@example.com', isOnline: false },
-    { id: '3', name: 'Carol White', email: 'carol@example.com', isOnline: true },
-    { id: '4', name: 'David Brown', email: 'david@example.com', isOnline: false },
-    { id: '5', name: 'Eve Davis', email: 'eve@example.com', isOnline: true },
-  ];
+  // Use the user search hook with debouncing
+  const { users: searchResults, loading: searchLoading, error: searchError } = useUserSearch(
+    searchQuery,
+    {
+      minLength: 2,
+      debounceMs: 300,
+      limit: 20,
+      excludeIds: selectedMembers.map((m) => m.id),
+    }
+  );
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    
-    if (query.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    // Filter users based on search query
-    const filtered = mockUsers.filter(
-      (user) =>
-        !selectedMembers.find((m) => m.id === user.id) &&
-        (user.name.toLowerCase().includes(query.toLowerCase()) ||
-          user.email.toLowerCase().includes(query.toLowerCase()))
-    );
-
-    setSearchResults(filtered);
   };
 
   const handleSelectMember = (user: User) => {
     setSelectedMembers([...selectedMembers, user]);
     setSearchQuery('');
-    setSearchResults([]);
   };
 
   const handleRemoveMember = (userId: string) => {
@@ -102,35 +91,20 @@ const CreateGroupScreen: React.FC = () => {
       return;
     }
 
-    setCreating(true);
-
     try {
-      // TODO: Replace with actual API call
-      // const response = await createGroupAPI({
-      //   name: groupName,
-      //   description: groupDescription,
-      //   avatar: groupAvatar,
-      //   isPrivate,
-      //   memberIds: selectedMembers.map(m => m.id),
-      // });
-
-      // Mock delay
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000));
-
-      console.log('Group created:', {
-        name: groupName,
-        description: groupDescription,
-        isPrivate,
-        members: selectedMembers.length,
+      const response = await createChatMutation.mutateAsync({
+        groupName: groupName.trim(),
+        memberIds: selectedMembers.map(m => m.id),
       });
 
-      // Navigate back to home or to the new group chat
-      navigation.goBack();
+      // Navigate to the new group chat
+      (navigation as any).navigate('Chat', {
+        chatId: response.chat.id,
+        chatName: response.chat.name,
+      });
     } catch (error) {
       console.error('Failed to create group:', error);
-      Alert.alert('Error', 'Failed to create group');
-    } finally {
-      setCreating(false);
+      Alert.alert('Error', 'Failed to create group. Please try again.');
     }
   };
 
@@ -227,8 +201,26 @@ const CreateGroupScreen: React.FC = () => {
             style={styles.searchbar}
           />
 
+          {/* Loading State */}
+          {searchLoading && (
+            <View style={styles.loadingContainer}>
+              <Text variant="bodyMedium" style={{ color: colors.text }}>
+                Searching...
+              </Text>
+            </View>
+          )}
+
+          {/* Error State */}
+          {searchError && (
+            <View style={styles.errorContainer}>
+              <Text variant="bodyMedium" style={{ color: colors.error }}>
+                {searchError}
+              </Text>
+            </View>
+          )}
+
           {/* Search Results */}
-          {searchResults.length > 0 && (
+          {!searchLoading && !searchError && searchResults.length > 0 && (
             <View style={styles.resultsContainer}>
               {searchResults.map((user) => (
                 <List.Item
@@ -236,10 +228,17 @@ const CreateGroupScreen: React.FC = () => {
                   title={user.name}
                   description={user.email}
                   left={() => (
-                    <Avatar.Text
-                      size={40}
-                      label={user.name.substring(0, 2).toUpperCase()}
-                    />
+                    user.avatarUrl ? (
+                      <Avatar.Image
+                        size={40}
+                        source={{ uri: `${config.SOCKET_URL}${user.avatarUrl}` }}
+                      />
+                    ) : (
+                      <Avatar.Text
+                        size={40}
+                        label={user.name.substring(0, 2).toUpperCase()}
+                      />
+                    )
                   )}
                   right={() => (
                     <Icon
@@ -256,7 +255,7 @@ const CreateGroupScreen: React.FC = () => {
             </View>
           )}
 
-          {searchQuery.length >= 2 && searchResults.length === 0 && (
+          {!searchLoading && !searchError && searchQuery.length >= 2 && searchResults.length === 0 && (
             <View style={styles.emptyResults}>
               <Text variant="bodyMedium" style={{ color: colors.text }}>
                 No users found
@@ -271,8 +270,8 @@ const CreateGroupScreen: React.FC = () => {
         <Button
           mode="contained"
           onPress={handleCreateGroup}
-          loading={creating}
-          disabled={creating || !groupName.trim() || selectedMembers.length === 0}
+          loading={createChatMutation.isPending}
+          disabled={createChatMutation.isPending || !groupName.trim() || selectedMembers.length === 0}
           style={styles.createButton}
         >
           Create Group
@@ -367,6 +366,14 @@ const styles = StyleSheet.create({
   },
   emptyResults: {
     padding: 24,
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  errorContainer: {
+    padding: 16,
     alignItems: 'center',
   },
   footer: {

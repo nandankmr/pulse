@@ -5,6 +5,8 @@ import { View, StyleSheet, TextInput as RNTextInput } from 'react-native';
 import { Button, Text, ActivityIndicator, TextInput } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useVerifyEmail, useResendVerification } from '../hooks/useAuth';
+import { isApiError } from '../types/api';
 
 interface RouteParams {
   email?: string;
@@ -15,12 +17,11 @@ const EmailVerificationScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { email } = (route.params as RouteParams) || {};
+  const verifyMutation = useVerifyEmail();
+  const resendMutation = useResendVerification();
   
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerified, setIsVerified] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [canResend, setCanResend] = useState(true);
   const [countdown, setCountdown] = useState(0);
@@ -43,7 +44,6 @@ const EmailVerificationScreen: React.FC = () => {
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    setError('');
 
     // Auto-focus next input
     if (value && index < 5) {
@@ -68,67 +68,37 @@ const EmailVerificationScreen: React.FC = () => {
   const handleVerifyOtp = async (otpCode?: string) => {
     const code = otpCode || otp.join('');
     
-    if (code.length !== 6) {
-      setError('Please enter all 6 digits');
+    if (code.length !== 6 || !email) {
       return;
     }
 
-    setLoading(true);
-    setError('');
-    
     try {
-      // TODO: Replace with actual API call
-      // const response = await verifyEmailOtpAPI({ email, otp: code });
-      // dispatch(setAuth(response));
-      // await saveAuthToken(response.token);
-      // await saveUserData(response.user);
-      
-      // Mock delay for demonstration
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000));
-      
-      // Mock success
+      await verifyMutation.mutateAsync({ email, otp: code });
       setIsVerified(true);
       
-      // Navigate to home after 1.5 seconds
+      // Navigate to login after showing success message
       setTimeout(() => {
-        // navigation.navigate('Home' as never);
-      }, 1500);
-      
-      console.log('Verify OTP:', { email, code });
-    } catch (err: any) {
-      setError(err.message || 'Invalid verification code. Please try again.');
+        navigation.navigate('Login' as never);
+      }, 2000);
+    } catch (err) {
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleResendCode = async () => {
-    if (!canResend) return;
+    if (!canResend || !email) return;
 
-    setResendLoading(true);
-    setMessage('');
-    setError('');
-    
     try {
-      // TODO: Replace with actual API call
-      // await resendVerificationOtpAPI({ email });
-      
-      // Mock delay for demonstration
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000));
-      
-      setMessage('Verification code sent! Please check your email.');
+      await resendMutation.mutateAsync({ email });
+      setMessage('Verification code sent! Check your email.');
       setCanResend(false);
-      setCountdown(60); // 60 second cooldown
-      setOtp(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+      setCountdown(60); // 60 second countdown
       
-      console.log('Resend verification code to:', email);
-    } catch (err: any) {
-      setError(err.message || 'Failed to resend code. Please try again.');
-    } finally {
-      setResendLoading(false);
+      // Clear message after 5 seconds
+      setTimeout(() => setMessage(''), 5000);
+    } catch (error: any) {
+      setMessage(error?.response?.data?.error || 'Failed to send code. Please try again.');
     }
   };
 
@@ -145,7 +115,7 @@ const EmailVerificationScreen: React.FC = () => {
               ✅ Email Verified!
             </Text>
             <Text variant="bodyLarge" style={[styles.successMessage, { color: colors.text }]}>
-              Your email has been successfully verified. Logging you in...
+              Your email has been successfully verified. Redirecting to login...
             </Text>
             <ActivityIndicator size="large" style={styles.loader} />
           </>
@@ -181,16 +151,18 @@ const EmailVerificationScreen: React.FC = () => {
                   keyboardType="number-pad"
                   maxLength={1}
                   style={styles.otpInput}
-                  error={!!error}
-                  disabled={loading || resendLoading}
+                  error={verifyMutation.isError}
+                  disabled={verifyMutation.isPending}
                   autoFocus={index === 0}
                 />
               ))}
             </View>
 
-            {error ? (
+            {verifyMutation.isError ? (
               <Text variant="bodyMedium" style={styles.errorText}>
-                {error}
+                {isApiError(verifyMutation.error) 
+                  ? verifyMutation.error.message 
+                  : 'Invalid verification code'}
               </Text>
             ) : null}
 
@@ -203,8 +175,8 @@ const EmailVerificationScreen: React.FC = () => {
             <Button
               mode="contained"
               onPress={() => handleVerifyOtp()}
-              loading={loading}
-              disabled={loading || resendLoading || otp.join('').length !== 6}
+              loading={verifyMutation.isPending}
+              disabled={verifyMutation.isPending || otp.join('').length !== 6}
               style={styles.button}
             >
               Verify Code
@@ -217,8 +189,8 @@ const EmailVerificationScreen: React.FC = () => {
               <Button
                 mode="text"
                 onPress={handleResendCode}
-                loading={resendLoading}
-                disabled={!canResend || resendLoading || loading}
+                disabled={!canResend || verifyMutation.isPending || resendMutation.isPending}
+                loading={resendMutation.isPending}
                 compact
               >
                 {countdown > 0 ? `Resend (${countdown}s)` : 'Resend Code'}
@@ -228,7 +200,7 @@ const EmailVerificationScreen: React.FC = () => {
             <Button
               mode="outlined"
               onPress={navigateToLogin}
-              disabled={loading || resendLoading}
+              disabled={verifyMutation.isPending}
               style={styles.backButton}
             >
               Back to Login

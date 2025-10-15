@@ -22,24 +22,41 @@ export const pickAttachment = async (): Promise<PickedAttachment | null> => {
       'Choose an option',
       [
         {
-          text: 'Take Photo',
-          onPress: async () => {
-            const result = await pickFromCamera('photo');
-            resolve(result);
-          },
-        },
-        {
-          text: 'Take Video',
-          onPress: async () => {
-            const result = await pickFromCamera('video');
-            resolve(result);
-          },
-        },
-        {
-          text: 'Choose from Gallery',
-          onPress: async () => {
-            const result = await pickFromGallery();
-            resolve(result);
+          text: 'Camera/Gallery',
+          onPress: () => {
+            // Show second menu for media
+            Alert.alert(
+              'Choose Media',
+              '',
+              [
+                {
+                  text: 'Take Photo',
+                  onPress: async () => {
+                    const result = await pickFromCamera('photo');
+                    resolve(result);
+                  },
+                },
+                {
+                  text: 'Take Video',
+                  onPress: async () => {
+                    const result = await pickFromCamera('video');
+                    resolve(result);
+                  },
+                },
+                {
+                  text: 'Choose from Gallery',
+                  onPress: async () => {
+                    const result = await pickFromGallery();
+                    resolve(result);
+                  },
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => resolve(null),
+                },
+              ],
+            );
           },
         },
         {

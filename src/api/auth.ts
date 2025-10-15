@@ -2,37 +2,89 @@
 
 import apiClient from './client';
 import { User } from '../store/authSlice';
+import { getDeviceInfo } from '../utils/deviceInfo';
 
+// Request types
 export interface LoginRequest {
   email: string;
   password: string;
+  deviceId?: string;
+  deviceName?: string;
+  platform?: string;
 }
 
 export interface RegisterRequest {
   name: string;
   email: string;
   password: string;
+  deviceId?: string;
+  deviceName?: string;
+  platform?: string;
 }
 
-export interface AuthResponse {
-  user: User;
-  token: string;
+export interface RefreshTokenRequest {
+  refreshToken: string;
+  deviceId?: string;
+}
+
+export interface VerifyEmailRequest {
+  email: string;
+  otp: string;
 }
 
 export interface ResendVerificationRequest {
   email: string;
 }
 
-export interface VerifyOtpRequest {
+export interface LogoutRequest {
+  refreshToken: string;
+  deviceId: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
   email: string;
   otp: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+// Response types
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  deviceId: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
+export interface VerifyEmailResponse {
+  user: User;
 }
 
 /**
  * Login user with email and password
  */
 export const loginAPI = async (data: LoginRequest): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/auth/login', data);
+  const deviceInfo = await getDeviceInfo();
+  const requestData = {
+    ...data,
+    deviceId: data.deviceId || deviceInfo.deviceId,
+    deviceName: data.deviceName || deviceInfo.deviceName,
+    platform: data.platform || deviceInfo.platform,
+  };
+  
+  const response = await apiClient.post<AuthResponse>('/auth/login', requestData);
   return response.data;
 };
 
@@ -40,36 +92,94 @@ export const loginAPI = async (data: LoginRequest): Promise<AuthResponse> => {
  * Register new user
  */
 export const registerAPI = async (data: RegisterRequest): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/auth/register', data);
+  const deviceInfo = await getDeviceInfo();
+  const requestData = {
+    ...data,
+    deviceId: data.deviceId || deviceInfo.deviceId,
+    deviceName: data.deviceName || deviceInfo.deviceName,
+    platform: data.platform || deviceInfo.platform,
+  };
+  
+  const response = await apiClient.post<AuthResponse>('/auth/register', requestData);
+  return response.data;
+};
+
+/**
+ * Refresh access token using refresh token
+ */
+export const refreshTokenAPI = async (
+  data: RefreshTokenRequest
+): Promise<AuthResponse> => {
+  const response = await apiClient.post<AuthResponse>('/auth/refresh', data);
   return response.data;
 };
 
 /**
  * Verify email with OTP code
  */
-export const verifyEmailOtpAPI = async (
-  data: VerifyOtpRequest
-): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/auth/verify-otp', data);
+export const verifyEmailAPI = async (
+  data: VerifyEmailRequest
+): Promise<VerifyEmailResponse> => {
+  const response = await apiClient.post<VerifyEmailResponse>('/auth/verify-email', data);
   return response.data;
 };
 
 /**
  * Resend email verification OTP
  */
-export const resendVerificationOtpAPI = async (
+export const resendVerificationAPI = async (
   data: ResendVerificationRequest
 ): Promise<{ message: string }> => {
   const response = await apiClient.post<{ message: string }>(
-    '/auth/resend-otp',
+    '/auth/resend-verification',
     data
   );
   return response.data;
 };
 
 /**
- * Logout user (if backend requires notification)
+ * Logout user and revoke refresh token on server
  */
-export const logoutAPI = async (): Promise<void> => {
-  await apiClient.post('/auth/logout');
+export const logoutAPI = async (data: LogoutRequest): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>('/auth/logout', data);
+  return response.data;
+};
+
+/**
+ * Request password reset OTP
+ */
+export const forgotPasswordAPI = async (
+  data: ForgotPasswordRequest
+): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>(
+    '/auth/forgot-password',
+    data
+  );
+  return response.data;
+};
+
+/**
+ * Reset password using OTP
+ */
+export const resetPasswordAPI = async (
+  data: ResetPasswordRequest
+): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>(
+    '/auth/reset-password',
+    data
+  );
+  return response.data;
+};
+
+/**
+ * Change password for authenticated user
+ */
+export const changePasswordAPI = async (
+  data: ChangePasswordRequest
+): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>(
+    '/auth/change-password',
+    data
+  );
+  return response.data;
 };

@@ -1,17 +1,24 @@
 // src/screens/ProfileScreen.tsx
 
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { TextInput, Button, Text, Avatar, Divider } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import { RootState } from '../store';
-import { updateUser, logout } from '../store/authSlice';
+import { updateUser } from '../store/authSlice';
+import { useLogout } from '../hooks/useAuth';
+import { clearAllData } from '../utils/storage';
+import { updateProfileAPI, uploadAvatarAPI } from '../api/user';
+import UserAvatar from '../components/UserAvatar';
 
 const ProfileScreen: React.FC = () => {
   const { colors } = useTheme();
   const dispatch = useDispatch();
-  const { user } = useSelector((state: RootState) => state.auth);
+  const navigation = useNavigation();
+  const { user, refreshToken, deviceId } = useSelector((state: RootState) => state.auth);
+  const logoutMutation = useLogout();
 
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
@@ -31,15 +38,17 @@ const ProfileScreen: React.FC = () => {
     setSuccess('');
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await updateProfileAPI({ name, email });
-      // dispatch(updateUser(response.user));
-
-      // Mock delay for demonstration
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000));
-
-      // Update local state
-      dispatch(updateUser({ name, email }));
+      const response = await updateProfileAPI({ name });
+      
+      // Update Redux store with response
+      dispatch(updateUser({
+        id: response.id,
+        name: response.name,
+        email: response.email,
+        avatarUrl: response.avatarUrl,
+        verified: response.verified,
+      }));
+      
       setSuccess('Profile updated successfully!');
       setIsEditing(false);
 
@@ -59,8 +68,39 @@ const ProfileScreen: React.FC = () => {
     setIsEditing(false);
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (refreshToken && deviceId) {
+                await logoutMutation.mutateAsync({ refreshToken, deviceId });
+              } else {
+                // If no tokens, just clear local data
+                await clearAllData();
+              }
+            } catch (error) {
+              // Even if backend call fails, clear local data
+              console.error('Logout error:', error);
+              await clearAllData();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleChangePassword = () => {
+    navigation.navigate('ChangePassword' as never);
   };
 
   const handleAvatarPress = async () => {
@@ -84,26 +124,26 @@ const ProfileScreen: React.FC = () => {
       setLoading(true);
       setError('');
 
-      // TODO: Replace with actual API calls
-      // 1. Get presigned URL
-      // const { presignedUrl, url } = await getAvatarUploadUrlAPI(
-      //   image.name,
-      //   image.type
-      // );
+      // Create FormData
+      const formData = new FormData();
+      formData.append('avatar', {
+        uri: image.uri,
+        type: image.type,
+        name: image.name,
+      } as any);
       
-      // 2. Upload to S3
-      // const blob = await fetch(image.uri).then(r => r.blob());
-      // await uploadAvatarToS3(presignedUrl, blob, image.type);
+      // Upload avatar using FormData directly
+      const response = await uploadAvatarAPI(formData);
       
-      // 3. Confirm upload and update profile
-      // const response = await confirmAvatarUploadAPI(url);
-      // dispatch(updateUser(response.user));
-
-      // Mock delay for demonstration
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
-
-      // Update local state with mock URL
-      dispatch(updateUser({ avatar: image.uri }));
+      // Update Redux store with response
+      dispatch(updateUser({
+        id: response.id,
+        name: response.name,
+        email: response.email,
+        avatarUrl: response.avatarUrl,
+        verified: response.verified,
+      }));
+      
       setSuccess('Avatar updated successfully!');
 
       console.log('Avatar upload:', image);
@@ -127,14 +167,12 @@ const ProfileScreen: React.FC = () => {
 
       <View style={styles.avatarContainer}>
         <TouchableOpacity onPress={handleAvatarPress} disabled={!isEditing}>
-          {user?.avatar ? (
-            <Avatar.Image size={120} source={{ uri: user.avatar }} />
-          ) : (
-            <Avatar.Text
-              size={120}
-              label={user?.name?.substring(0, 2).toUpperCase() || 'U'}
-            />
-          )}
+          <UserAvatar
+            size={100}
+            avatarUrl={user?.avatarUrl}
+            name={user?.name}
+            style={styles.avatar}
+          />
         </TouchableOpacity>
         {isEditing && (
           <Text variant="bodySmall" style={[styles.avatarHint, { color: colors.text }]}>
@@ -174,15 +212,15 @@ const ProfileScreen: React.FC = () => {
           style={styles.input}
         />
 
-        {user?.isEmailVerified !== undefined && (
+        {user?.verified !== undefined && (
           <View style={styles.verificationBadge}>
             <Text
               variant="bodyMedium"
               style={{
-                color: user.isEmailVerified ? '#4CAF50' : '#FF9800',
+                color: user.verified ? '#4CAF50' : '#FF9800',
               }}
             >
-              {user.isEmailVerified ? '✓ Email Verified' : '⚠ Email Not Verified'}
+              {user.verified ? '✓ Email Verified' : '⚠ Email Not Verified'}
             </Text>
           </View>
         )}
@@ -232,10 +270,25 @@ const ProfileScreen: React.FC = () => {
 
       <Divider style={styles.divider} />
 
+      <View style={styles.actions}>
+        <Button
+          mode="outlined"
+          onPress={handleChangePassword}
+          icon="lock"
+          style={styles.actionButton}
+        >
+          Change Password
+        </Button>
+      </View>
+
+      <Divider style={styles.divider} />
+
       <View style={styles.dangerZone}>
         <Button
           mode="outlined"
           onPress={handleLogout}
+          loading={logoutMutation.isPending}
+          disabled={logoutMutation.isPending}
           textColor="#F44336"
           style={styles.logoutButton}
         >
@@ -247,6 +300,10 @@ const ProfileScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  avatar: {
+    width: 100,
+    height: 100,
+  },
   container: {
     flex: 1,
   },
@@ -299,6 +356,13 @@ const styles = StyleSheet.create({
   buttonHalf: {
     flex: 1,
     paddingVertical: 6,
+  },
+  actions: {
+    marginTop: 8,
+  },
+  actionButton: {
+    paddingVertical: 6,
+    marginBottom: 12,
   },
   dangerZone: {
     marginTop: 24,

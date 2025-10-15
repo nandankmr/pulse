@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { setAuth, setLoading } from '../store/authSlice';
-import { getAuthToken, getUserData } from '../utils/storage';
+import { getAuthTokens, getUserData } from '../utils/storage';
 
 /**
  * Hook to restore auth state from AsyncStorage on app startup
@@ -17,13 +17,25 @@ export const useAuthRestore = () => {
       try {
         dispatch(setLoading(true));
 
-        const [token, user] = await Promise.all([
-          getAuthToken(),
+        const [tokens, user] = await Promise.all([
+          getAuthTokens(),
           getUserData(),
         ]);
 
-        if (token && user) {
-          dispatch(setAuth({ token, user }));
+        if (
+          tokens.accessToken &&
+          tokens.refreshToken &&
+          tokens.deviceId &&
+          user
+        ) {
+          dispatch(
+            setAuth({
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken,
+              deviceId: tokens.deviceId,
+              user,
+            })
+          );
         }
       } catch (error) {
         console.error('Failed to restore auth state:', error);

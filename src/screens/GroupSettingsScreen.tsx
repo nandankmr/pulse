@@ -1,6 +1,6 @@
 // src/screens/GroupSettingsScreen.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -24,26 +24,11 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-
-interface GroupMember {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  role: 'admin' | 'member';
-  isOnline: boolean;
-}
-
-interface GroupInfo {
-  id: string;
-  name: string;
-  description: string;
-  avatar?: string;
-  isPrivate: boolean;
-  createdBy: string;
-  memberCount: number;
-  createdAt: string;
-}
+import { useGroup, useRemoveGroupMember, useCreateInvitation } from '../hooks/useGroups';
+import { useGroupMembers, useUpdateMemberRole, useUpdateGroupDetails } from '../hooks/useChatManagement';
+import { isGroupAdmin } from '../api/group';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 
 interface RouteParams {
   groupId: string;
@@ -54,91 +39,23 @@ const GroupSettingsScreen: React.FC = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { groupId } = (route.params as RouteParams) || {};
+  
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const currentUserId = currentUser?.id || '';
 
-  const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
-  const [members, setMembers] = useState<GroupMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Fetch group data
+  const { data: group, isLoading } = useGroup(groupId);
+  const { data: membersData, isLoading: membersLoading } = useGroupMembers(groupId);
+  const removeMemberMutation = useRemoveGroupMember();
+  const updateRoleMutation = useUpdateMemberRole();
+  const updateGroupMutation = useUpdateGroupDetails();
+  const createInvitationMutation = useCreateInvitation();
+
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const currentUserId = 'current-user';
 
-  useEffect(() => {
-    loadGroupInfo();
-    loadMembers();
-  }, [groupId]);
-
-  const loadGroupInfo = async () => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await getGroupInfoAPI(groupId);
-      // setGroupInfo(response.group);
-
-      // Mock data
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 500));
-      setGroupInfo({
-        id: groupId,
-        name: 'Project Team',
-        description: 'Discussing project updates and tasks',
-        isPrivate: true,
-        createdBy: 'current-user',
-        memberCount: 5,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error('Failed to load group info:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMembers = async () => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await getGroupMembersAPI(groupId);
-      // setMembers(response.members);
-
-      // Mock data
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 500));
-      setMembers([
-        {
-          id: 'current-user',
-          name: 'You',
-          email: 'you@example.com',
-          role: 'admin',
-          isOnline: true,
-        },
-        {
-          id: '1',
-          name: 'Alice Johnson',
-          email: 'alice@example.com',
-          role: 'admin',
-          isOnline: true,
-        },
-        {
-          id: '2',
-          name: 'Bob Smith',
-          email: 'bob@example.com',
-          role: 'member',
-          isOnline: false,
-        },
-        {
-          id: '3',
-          name: 'Carol White',
-          email: 'carol@example.com',
-          role: 'member',
-          isOnline: true,
-        },
-      ]);
-    } catch (error) {
-      console.error('Failed to load members:', error);
-    }
-  };
-
-  const isAdmin = () => {
-    const currentMember = members.find((m) => m.id === currentUserId);
-    return currentMember?.role === 'admin';
-  };
+  const isAdmin = group ? isGroupAdmin(group, currentUserId) : false;
 
   const handleLeaveGroup = () => {
     setShowLeaveDialog(true);
@@ -146,10 +63,10 @@ const GroupSettingsScreen: React.FC = () => {
 
   const confirmLeaveGroup = async () => {
     try {
-      // TODO: Replace with actual API call
-      // await leaveGroupAPI(groupId);
-
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 500));
+      await removeMemberMutation.mutateAsync({
+        groupId,
+        userId: currentUserId,
+      });
       setShowLeaveDialog(false);
       navigation.goBack();
     } catch (error) {
@@ -158,10 +75,13 @@ const GroupSettingsScreen: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = (memberId: string, memberName: string) => {
+  const handleRemoveMember = (memberId: string) => {
+    const member = group?.members.find(m => m.userId === memberId);
+    if (!member) return;
+
     Alert.alert(
       'Remove Member',
-      `Remove ${memberName} from this group?`,
+      `Remove this member from the group?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -169,11 +89,10 @@ const GroupSettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Replace with actual API call
-              // await removeMemberAPI(groupId, memberId);
-
-              await new Promise<void>((resolve) => setTimeout(() => resolve(), 500));
-              setMembers(members.filter((m) => m.id !== memberId));
+              await removeMemberMutation.mutateAsync({
+                groupId,
+                userId: memberId,
+              });
             } catch (error) {
               console.error('Failed to remove member:', error);
               Alert.alert('Error', 'Failed to remove member');
@@ -194,15 +113,12 @@ const GroupSettingsScreen: React.FC = () => {
           text: 'Make Admin',
           onPress: async () => {
             try {
-              // TODO: Replace with actual API call
-              // await updateMemberRoleAPI(groupId, memberId, 'admin');
-
-              await new Promise<void>((resolve) => setTimeout(() => resolve(), 500));
-              setMembers(
-                members.map((m) =>
-                  m.id === memberId ? { ...m, role: 'admin' } : m
-                )
-              );
+              await updateRoleMutation.mutateAsync({
+                chatId: groupId,
+                memberId,
+                data: { role: 'ADMIN' },
+              });
+              Alert.alert('Success', `${memberName} is now an admin`);
             } catch (error) {
               console.error('Failed to update role:', error);
               Alert.alert('Error', 'Failed to update member role');
@@ -213,58 +129,68 @@ const GroupSettingsScreen: React.FC = () => {
     );
   };
 
-  const handleAddMembers = () => {
-    setShowAddMemberDialog(true);
-  };
-
-  const renderMember = (member: GroupMember) => {
-    const isCurrentUser = member.id === currentUserId;
-    const canManage = isAdmin() && !isCurrentUser;
-
-    return (
-      <List.Item
-        key={member.id}
-        title={member.name}
-        description={member.role === 'admin' ? 'Admin' : 'Member'}
-        left={() => (
-          <View>
-            <Avatar.Text
-              size={40}
-              label={member.name.substring(0, 2).toUpperCase()}
-            />
-            {member.isOnline && <View style={styles.onlineBadge} />}
-          </View>
-        )}
-        right={() =>
-          canManage ? (
-            <IconButton
-              icon="dots-vertical"
-              onPress={() => {
-                Alert.alert(
-                  member.name,
-                  'Choose an action',
-                  [
-                    {
-                      text: 'Make Admin',
-                      onPress: () => handleMakeAdmin(member.id, member.name),
-                    },
-                    {
-                      text: 'Remove from Group',
-                      style: 'destructive',
-                      onPress: () => handleRemoveMember(member.id, member.name),
-                    },
-                    { text: 'Cancel', style: 'cancel' },
-                  ]
-                );
-              }}
-            />
-          ) : null
-        }
-      />
+  const handleDemoteMember = async (memberId: string, memberName: string) => {
+    Alert.alert(
+      'Remove Admin',
+      `Remove admin privileges from ${memberName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateRoleMutation.mutateAsync({
+                chatId: groupId,
+                memberId,
+                data: { role: 'MEMBER' },
+              });
+              Alert.alert('Success', `${memberName} is now a regular member`);
+            } catch (error) {
+              console.error('Failed to update role:', error);
+              Alert.alert('Error', 'Failed to update member role');
+            }
+          },
+        },
+      ]
     );
   };
 
-  if (loading || !groupInfo) {
+  const handleEditGroup = () => {
+    navigation.navigate('EditGroup' as never, { groupId } as never);
+  };
+
+  const handleGenerateInvite = async () => {
+    try {
+      const invitation = await createInvitationMutation.mutateAsync({
+        groupId,
+        data: { expiresInHours: 72 },
+      });
+      
+      // Create shareable link
+      const inviteLink = `pulse://join/${groupId}?token=${invitation.token}`;
+      
+      Alert.alert(
+        'Invitation Link',
+        inviteLink,
+        [
+          { text: 'Close', style: 'cancel' },
+          {
+            text: 'Copy',
+            onPress: () => {
+              // TODO: Implement clipboard copy
+              console.log('Copy to clipboard:', inviteLink);
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to generate invite:', error);
+      Alert.alert('Error', 'Failed to generate invitation link');
+    }
+  };
+
+  if (isLoading || !group) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
         <Text variant="bodyLarge" style={{ color: colors.text }}>
@@ -279,23 +205,23 @@ const GroupSettingsScreen: React.FC = () => {
       <ScrollView>
         {/* Group Info */}
         <View style={styles.headerSection}>
-          {groupInfo.avatar ? (
-            <Image source={{ uri: groupInfo.avatar }} style={styles.groupAvatar} />
+          {group.avatarUrl ? (
+            <Image source={{ uri: group.avatarUrl }} style={styles.groupAvatar} />
           ) : (
             <View style={[styles.groupAvatarPlaceholder, { backgroundColor: colors.primary }]}>
               <Icon name="account-group" size={48} color="#FFFFFF" />
             </View>
           )}
           <Text variant="headlineSmall" style={[styles.groupName, { color: colors.text }]}>
-            {groupInfo.name}
+            {group.name}
           </Text>
-          {groupInfo.description && (
+          {group.description && (
             <Text variant="bodyMedium" style={[styles.groupDescription, { color: colors.text }]}>
-              {groupInfo.description}
+              {group.description}
             </Text>
           )}
           <Text variant="bodySmall" style={[styles.memberCount, { color: colors.text }]}>
-            {members.length} members
+            {group.members.length} members
           </Text>
         </View>
 
@@ -307,23 +233,22 @@ const GroupSettingsScreen: React.FC = () => {
             Settings
           </Text>
           
-          <List.Item
-            title="Private Group"
-            description={groupInfo.isPrivate ? 'Only invited members can join' : 'Anyone can join'}
-            left={() => <List.Icon icon="lock" />}
-            right={() => <Switch value={groupInfo.isPrivate} disabled />}
-          />
-
-          {isAdmin() && (
-            <List.Item
-              title="Edit Group Info"
-              description="Change name, description, or photo"
-              left={() => <List.Icon icon="pencil" />}
-              onPress={() => {
-                // TODO: Navigate to edit group screen
-                console.log('Edit group info');
-              }}
-            />
+          {isAdmin && (
+            <>
+              <List.Item
+                title="Edit Group Info"
+                description="Change name, description, or photo"
+                left={() => <List.Icon icon="pencil" />}
+                onPress={handleEditGroup}
+              />
+              
+              <List.Item
+                title="Generate Invite Link"
+                description="Create a link to invite new members"
+                left={() => <List.Icon icon="link" />}
+                onPress={handleGenerateInvite}
+              />
+            </>
           )}
         </View>
 
@@ -333,18 +258,87 @@ const GroupSettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>
-              Members ({members.length})
+              Members ({group.members.length})
             </Text>
-            {isAdmin() && (
-              <IconButton
-                icon="account-plus"
-                size={24}
-                onPress={handleAddMembers}
-              />
-            )}
           </View>
 
-          {members.map(renderMember)}
+          {membersLoading ? (
+            <Text variant="bodyMedium" style={[styles.loadingText, { color: colors.text }]}>
+              Loading members...
+            </Text>
+          ) : membersData?.members ? (
+            membersData.members.map((member) => {
+              const isCurrentUser = member.id === currentUserId;
+              const canManage = isAdmin && !isCurrentUser;
+
+              return (
+                <List.Item
+                  key={member.id}
+                  title={member.name}
+                  description={
+                    <View style={styles.memberDescription}>
+                      <Text variant="bodySmall">{member.email}</Text>
+                      <Text variant="bodySmall" style={styles.roleBadge}>
+                        {member.role === 'ADMIN' ? '👑 Admin' : 'Member'}
+                      </Text>
+                      {member.isOnline && (
+                        <Text variant="bodySmall" style={{ color: '#4CAF50' }}>
+                          • Online
+                        </Text>
+                      )}
+                    </View>
+                  }
+                  left={() => (
+                    member.avatar ? (
+                      <Avatar.Image size={40} source={{ uri: member.avatar }} />
+                    ) : (
+                      <Avatar.Text
+                        size={40}
+                        label={member.name.substring(0, 2).toUpperCase()}
+                      />
+                    )
+                  )}
+                  right={() =>
+                    canManage ? (
+                      <IconButton
+                        icon="dots-vertical"
+                        onPress={() => {
+                          Alert.alert(
+                            'Manage Member',
+                            `Manage ${member.name}`,
+                            [
+                              member.role === 'MEMBER' && {
+                                text: 'Make Admin',
+                                onPress: () => handleMakeAdmin(member.id, member.name),
+                              },
+                              member.role === 'ADMIN' && {
+                                text: 'Remove Admin',
+                                onPress: () => handleDemoteMember(member.id, member.name),
+                              },
+                              {
+                                text: 'Remove from Group',
+                                style: 'destructive',
+                                onPress: () => handleRemoveMember(member.id),
+                              },
+                              { text: 'Cancel', style: 'cancel' },
+                            ].filter(Boolean) as any
+                          );
+                        }}
+                      />
+                    ) : isCurrentUser && member.role === 'ADMIN' ? (
+                      <Text variant="bodySmall" style={styles.youBadge}>
+                        You
+                      </Text>
+                    ) : null
+                  }
+                />
+              );
+            })
+          ) : (
+            <Text variant="bodyMedium" style={[styles.loadingText, { color: colors.text }]}>
+              No members found
+            </Text>
+          )}
         </View>
 
         <Divider />
@@ -366,7 +360,7 @@ const GroupSettingsScreen: React.FC = () => {
           <Dialog.Title>Leave Group?</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium">
-              Are you sure you want to leave "{groupInfo.name}"?
+              Are you sure you want to leave "{group.name}"?
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
@@ -374,24 +368,6 @@ const GroupSettingsScreen: React.FC = () => {
             <Button onPress={confirmLeaveGroup} textColor="#F44336">
               Leave
             </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Add Members Dialog */}
-        <Dialog visible={showAddMemberDialog} onDismiss={() => setShowAddMemberDialog(false)}>
-          <Dialog.Title>Add Members</Dialog.Title>
-          <Dialog.Content>
-            <Searchbar
-              placeholder="Search users"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <Text variant="bodySmall" style={styles.dialogHint}>
-              Feature coming soon
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowAddMemberDialog(false)}>Close</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -466,6 +442,24 @@ const styles = StyleSheet.create({
   dialogHint: {
     marginTop: 16,
     opacity: 0.6,
+  },
+  loadingText: {
+    padding: 16,
+    textAlign: 'center',
+    opacity: 0.6,
+  },
+  memberDescription: {
+    flexDirection: 'column',
+    gap: 4,
+  },
+  roleBadge: {
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  youBadge: {
+    alignSelf: 'center',
+    opacity: 0.6,
+    marginRight: 8,
   },
 });
 

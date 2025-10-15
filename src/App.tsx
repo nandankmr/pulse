@@ -4,7 +4,7 @@
  *
  * @format
  */
-
+import 'react-native-gesture-handler';
 import { StatusBar, useColorScheme, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -21,12 +21,20 @@ import { ThemeProvider } from './theme/ThemeContext';
 import { colors } from './theme';
 import AppNavigator from './navigation/AppNavigator';
 import { useAuthRestore } from './hooks/useAuthRestore';
+import { useSocketConnection } from './hooks/useSocket';
+import { useMessageNotifications } from './hooks/useNotifications';
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { isRestoring } = useAuthRestore();
   const isDarkMode = useColorScheme() === 'dark';
+  
+  // Initialize socket connection when authenticated
+  useSocketConnection();
+  
+  // Initialize message notifications
+  useMessageNotifications();
 
   if (isRestoring) {
     return (

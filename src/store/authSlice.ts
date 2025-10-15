@@ -6,20 +6,26 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
-  isEmailVerified: boolean;
+  avatarUrl?: string | null;
+  verified: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface AuthState {
   user: User | null;
-  token: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  deviceId: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
 
 const initialState: AuthState = {
   user: null,
-  token: null,
+  accessToken: null,
+  refreshToken: null,
+  deviceId: null,
   isAuthenticated: false,
   isLoading: false,
 };
@@ -28,11 +34,33 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setAuth: (state, action: PayloadAction<{ user: User; token: string }>) => {
+    setAuth: (
+      state,
+      action: PayloadAction<{
+        user: User;
+        accessToken: string;
+        refreshToken: string;
+        deviceId: string;
+      }>
+    ) => {
       state.user = action.payload.user;
-      state.token = action.payload.token;
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+      state.deviceId = action.payload.deviceId;
       state.isAuthenticated = true;
       state.isLoading = false;
+    },
+    setTokens: (
+      state,
+      action: PayloadAction<{
+        accessToken: string;
+        refreshToken: string;
+        deviceId: string;
+      }>
+    ) => {
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+      state.deviceId = action.payload.deviceId;
     },
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
@@ -47,12 +75,15 @@ export const authSlice = createSlice({
     },
     logout: (state) => {
       state.user = null;
-      state.token = null;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.deviceId = null;
       state.isAuthenticated = false;
       state.isLoading = false;
     },
   },
 });
 
-export const { setAuth, setUser, updateUser, setLoading, logout } = authSlice.actions;
+export const { setAuth, setTokens, setUser, updateUser, setLoading, logout } =
+  authSlice.actions;
 export default authSlice.reducer;

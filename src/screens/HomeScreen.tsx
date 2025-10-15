@@ -1,59 +1,48 @@
 // src/screens/HomeScreen.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { Text, Searchbar, FAB, Divider } from 'react-native-paper';
+import { Text, Searchbar, FAB, Divider, Portal, Dialog, Button, List } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import ChatListItem, { Chat } from '../components/ChatListItem';
-import { getMockChats } from '../utils/mockData';
+import { useChats } from '../hooks/useChats';
+import { socketManager } from '../utils/socketManager';
+import { useQueryClient } from '@tanstack/react-query';
 
 const HomeScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
+  const queryClient = useQueryClient();
+  const { data, isLoading, refetch, isRefetching } = useChats();
 
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
 
-  const loadChats = async () => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await getChatsAPI();
-      // setChats(response.chats);
-      
-      const mockChats = await getMockChats();
-      setChats(mockChats);
-      setFilteredChats(mockChats);
-    } catch (error) {
-      console.error('Failed to load chats:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const chats = data?.chats || [];
 
+  // Listen for new messages to update chat list
   useEffect(() => {
-    loadChats();
-  }, []);
+    const handleNewMessage = () => {
+      // Invalidate chats query to refetch the list
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+    };
 
-  useEffect(() => {
+    socketManager.on('message:new', handleNewMessage);
+
+    return () => {
+      socketManager.off('message:new', handleNewMessage);
+    };
+  }, [queryClient]);
+
+  const filteredChats = useMemo(() => {
     if (searchQuery.trim() === '') {
-      setFilteredChats(chats);
-    } else {
-      const filtered = chats.filter((chat) =>
-        chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredChats(filtered);
+      return chats;
     }
+    return chats.filter((chat) =>
+      chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   }, [searchQuery, chats]);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadChats();
-  };
 
   const handleChatPress = (chat: Chat) => {
     (navigation as any).navigate('Chat', {
@@ -63,7 +52,17 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleNewChat = () => {
-    // Show options: New Chat or New Group
+    // Show dialog with options: Direct Message or Create Group
+    setShowNewChatDialog(true);
+  };
+
+  const handleDirectMessage = () => {
+    setShowNewChatDialog(false);
+    (navigation as any).navigate('UserSearch');
+  };
+
+  const handleCreateGroup = () => {
+    setShowNewChatDialog(false);
     (navigation as any).navigate('CreateGroup');
   };
 
@@ -89,7 +88,7 @@ const HomeScreen: React.FC = () => {
         style={styles.searchbar}
       />
 
-      {loading ? (
+      {isLoading ? (
         <View style={styles.emptyContainer}>
           <Text variant="bodyLarge" style={{ color: colors.text }}>
             Loading chats...
@@ -115,7 +114,7 @@ const HomeScreen: React.FC = () => {
           )}
           ItemSeparatorComponent={() => <Divider />}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />
           }
         />
       )}
@@ -126,6 +125,33 @@ const HomeScreen: React.FC = () => {
         onPress={handleNewChat}
         label="New Chat"
       />
+
+      {/* New Chat Options Dialog */}
+      <Portal>
+        <Dialog visible={showNewChatDialog} onDismiss={() => setShowNewChatDialog(false)}>
+          <Dialog.Title>New Chat</Dialog.Title>
+          <Dialog.Content>
+            <List.Item
+              title="Direct Message"
+              description="Start a one-on-one conversation"
+              left={props => <List.Icon {...props} icon="account" />}
+              onPress={handleDirectMessage}
+              style={styles.dialogOption}
+            />
+            <Divider />
+            <List.Item
+              title="Create Group"
+              description="Start a group conversation"
+              left={props => <List.Icon {...props} icon="account-group" />}
+              onPress={handleCreateGroup}
+              style={styles.dialogOption}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowNewChatDialog(false)}>Cancel</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 };
@@ -166,6 +192,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     bottom: 16,
+  },
+  dialogOption: {
+    paddingVertical: 8,
   },
 });
 

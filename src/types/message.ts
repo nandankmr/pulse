@@ -12,6 +12,8 @@ export interface Message {
   isSent: boolean;
   attachments?: Attachment[];
   replyTo?: string; // Message ID being replied to
+  editedAt?: string; // Timestamp when message was edited
+  deletedAt?: string; // Timestamp when message was deleted
 }
 
 export interface Attachment {

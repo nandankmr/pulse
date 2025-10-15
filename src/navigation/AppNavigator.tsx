@@ -11,12 +11,40 @@ import ProfileScreen from '../screens/ProfileScreen.tsx';
 import LoginScreen from '../screens/LoginScreen.tsx';
 import RegisterScreen from '../screens/RegisterScreen.tsx';
 import EmailVerificationScreen from '../screens/EmailVerificationScreen.tsx';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen.tsx';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen.tsx';
 import ChatScreen from '../screens/ChatScreen.tsx';
 import CreateGroupScreen from '../screens/CreateGroupScreen.tsx';
 import GroupSettingsScreen from '../screens/GroupSettingsScreen.tsx';
+import EditGroupScreen from '../screens/EditGroupScreen.tsx';
+import UserSearchScreen from '../screens/UserSearchScreen.tsx';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen.tsx';
+import UserDetailsScreen from '../screens/UserDetailsScreen.tsx';
+import GroupDetailsScreen from '../screens/GroupDetailsScreen.tsx';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-const Stack = createStackNavigator();
+// Define navigation types
+export type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  EmailVerification: { email: string };
+  ForgotPassword: undefined;
+  ResetPassword: { email: string };
+  Main: undefined;
+  Chat: { chatId: string; chatName?: string; isGroup?: boolean };
+  CreateGroup: undefined;
+  GroupSettings: { groupId: string };
+  EditGroup: { groupId: string };
+  UserSearch: undefined;
+  ChangePassword: undefined;
+  UserDetails: { userId: string };
+  GroupDetails: { groupId: string; groupName?: string; groupAvatar?: string };
+  Home: undefined;
+  Profile: undefined;
+  Chats: undefined;
+};
+
+const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
@@ -65,6 +93,16 @@ export default function AppNavigator() {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
+            <Stack.Screen 
+              name="ForgotPassword" 
+              component={ForgotPasswordScreen}
+              options={{ headerShown: true, title: 'Forgot Password' }}
+            />
+            <Stack.Screen 
+              name="ResetPassword" 
+              component={ResetPasswordScreen}
+              options={{ headerShown: true, title: 'Reset Password' }}
+            />
           </>
         ) : (
           // App Stack
@@ -84,6 +122,31 @@ export default function AppNavigator() {
               name="GroupSettings" 
               component={GroupSettingsScreen}
               options={{ headerShown: true, title: 'Group Settings' }}
+            />
+            <Stack.Screen 
+              name="EditGroup" 
+              component={EditGroupScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="UserSearch" 
+              component={UserSearchScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="ChangePassword" 
+              component={ChangePasswordScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="UserDetails" 
+              component={UserDetailsScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="GroupDetails" 
+              component={GroupDetailsScreen}
+              options={{ headerShown: false }}
             />
           </>
         )}
