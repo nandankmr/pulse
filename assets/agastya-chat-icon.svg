@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="agastyaGradient" x1="16" y1="16" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1A5FFF" />
+      <stop offset="1" stop-color="#58D5FF" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer rounded square -->
+  <rect x="12" y="12" width="104" height="104" rx="28" fill="url(#agastyaGradient)" />
+
+  <!-- Stylized letter A -->
+  <path d="M64 36C53 36 42 43 42 56C42 63 46 70 53 74L42 92L56 84L64 86L72 84L86 92L75 74C82 70 86 63 86 56C86 43 75 36 64 36Z" fill="white" opacity="0.18" />
+  <path d="M64 48L48 84H56.5L59.8 76H68.2L71.5 84H80L64 48ZM61.7 70L64 63.6L66.3 70H61.7Z" fill="white" />
+
+  <!-- Chat bubble -->
+  <path d="M88 94H52L40 104L43.5 94H40C32 94 28 90 28 82V70C28 62 32 58 40 58H88C96 58 100 62 100 70V82C100 90 96 94 88 94Z" fill="white" opacity="0.9" />
+  <circle cx="48" cy="78" r="5" fill="#1A5FFF" />
+  <circle cx="64" cy="78" r="5" fill="#1A5FFF" />
+  <circle cx="80" cy="78" r="5" fill="#1A5FFF" />
+</svg>

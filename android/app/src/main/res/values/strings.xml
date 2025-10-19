@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">pulse</string>
+    <string name="app_name">Agastya</string>
+    <string name="pulse_default_channel">Pulse Messages</string>
 </resources>

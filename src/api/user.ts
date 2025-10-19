@@ -40,19 +40,14 @@ export const updateProfileAPI = async (
 };
 
 /**
- * Upload avatar (multipart form data)
+ * Upload avatar reference
  */
-export const uploadAvatarAPI = async (
-  formData: FormData
-): Promise<UpdateProfileResponse> => {
+export const uploadAvatarAPI = async (payload: { filename: string }): Promise<UpdateProfileResponse> => {
+  console.log('Uploading avatar:', payload);
+  
   const response = await apiClient.post<UpdateProfileResponse>(
     '/users/me/avatar',
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
+    payload
   );
   return response.data;
 };

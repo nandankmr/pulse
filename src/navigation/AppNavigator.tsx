@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import HomeScreen from '../screens/HomeScreen.tsx';
 import ProfileScreen from '../screens/ProfileScreen.tsx';
+import EditProfileScreen from '../screens/EditProfileScreen.tsx';
 import LoginScreen from '../screens/LoginScreen.tsx';
 import RegisterScreen from '../screens/RegisterScreen.tsx';
 import EmailVerificationScreen from '../screens/EmailVerificationScreen.tsx';
@@ -22,27 +23,8 @@ import ChangePasswordScreen from '../screens/ChangePasswordScreen.tsx';
 import UserDetailsScreen from '../screens/UserDetailsScreen.tsx';
 import GroupDetailsScreen from '../screens/GroupDetailsScreen.tsx';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-
-// Define navigation types
-export type RootStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  EmailVerification: { email: string };
-  ForgotPassword: undefined;
-  ResetPassword: { email: string };
-  Main: undefined;
-  Chat: { chatId: string; chatName?: string; isGroup?: boolean };
-  CreateGroup: undefined;
-  GroupSettings: { groupId: string };
-  EditGroup: { groupId: string };
-  UserSearch: undefined;
-  ChangePassword: undefined;
-  UserDetails: { userId: string };
-  GroupDetails: { groupId: string; groupName?: string; groupAvatar?: string };
-  Home: undefined;
-  Profile: undefined;
-  Chats: undefined;
-};
+import { navigationRef, notifyNavigationReady } from './navigationRef';
+import type { RootStackParamList } from './types';
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -82,7 +64,7 @@ export default function AppNavigator() {
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={notifyNavigationReady}>
       <Stack.Navigator
         initialRouteName={isAuthenticated ? 'Main' : 'Login'}
         screenOptions={{ headerShown: false }}
@@ -137,6 +119,11 @@ export default function AppNavigator() {
               name="ChangePassword" 
               component={ChangePasswordScreen}
               options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EditProfile" 
+              component={EditProfileScreen}
+              options={{ headerShown: true, title: 'Edit Profile' }}
             />
             <Stack.Screen 
               name="UserDetails" 

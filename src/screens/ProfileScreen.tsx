@@ -1,72 +1,22 @@
 // src/screens/ProfileScreen.tsx
 
-import React, { useState } from 'react';
+import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { TextInput, Button, Text, Avatar, Divider } from 'react-native-paper';
+import { Button, Text, Divider } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { RootState } from '../store';
-import { updateUser } from '../store/authSlice';
 import { useLogout } from '../hooks/useAuth';
 import { clearAllData } from '../utils/storage';
-import { updateProfileAPI, uploadAvatarAPI } from '../api/user';
 import UserAvatar from '../components/UserAvatar';
+import AgastyaChatIcon from '../../assets/agastya-chat-icon.svg';
 
 const ProfileScreen: React.FC = () => {
   const { colors } = useTheme();
-  const dispatch = useDispatch();
   const navigation = useNavigation();
   const { user, refreshToken, deviceId } = useSelector((state: RootState) => state.auth);
   const logoutMutation = useLogout();
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const handleSave = async () => {
-    if (!name.trim()) {
-      setError('Name cannot be empty');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const response = await updateProfileAPI({ name });
-      
-      // Update Redux store with response
-      dispatch(updateUser({
-        id: response.id,
-        name: response.name,
-        email: response.email,
-        avatarUrl: response.avatarUrl,
-        verified: response.verified,
-      }));
-      
-      setSuccess('Profile updated successfully!');
-      setIsEditing(false);
-
-      console.log('Update profile:', { name, email });
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setName(user?.name || '');
-    setEmail(user?.email || '');
-    setError('');
-    setSuccess('');
-    setIsEditing(false);
-  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -103,55 +53,8 @@ const ProfileScreen: React.FC = () => {
     navigation.navigate('ChangePassword' as never);
   };
 
-  const handleAvatarPress = async () => {
-    if (!isEditing) return;
-
-    try {
-      // Import dynamically to avoid issues if not used
-      const { pickImage, validateImage } = await import('../utils/imagePicker');
-      
-      // Pick image
-      const image = await pickImage();
-      if (!image) return;
-
-      // Validate image
-      const validation = validateImage(image);
-      if (!validation.valid) {
-        setError(validation.error || 'Invalid image');
-        return;
-      }
-
-      setLoading(true);
-      setError('');
-
-      // Create FormData
-      const formData = new FormData();
-      formData.append('avatar', {
-        uri: image.uri,
-        type: image.type,
-        name: image.name,
-      } as any);
-      
-      // Upload avatar using FormData directly
-      const response = await uploadAvatarAPI(formData);
-      
-      // Update Redux store with response
-      dispatch(updateUser({
-        id: response.id,
-        name: response.name,
-        email: response.email,
-        avatarUrl: response.avatarUrl,
-        verified: response.verified,
-      }));
-      
-      setSuccess('Avatar updated successfully!');
-
-      console.log('Avatar upload:', image);
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload avatar');
-    } finally {
-      setLoading(false);
-    }
+  const handleEditProfile = () => {
+    navigation.navigate('EditProfile' as never);
   };
 
   return (
@@ -159,6 +62,11 @@ const ProfileScreen: React.FC = () => {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
     >
+      {/* <View style={styles.branding}>
+        <AgastyaChatIcon width={72} height={72} />
+        <Text variant="titleLarge" style={[styles.brandingText, { color: colors.text }]}>Agastya</Text>
+      </View> */}
+
       <View style={styles.header}>
         <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
           Profile
@@ -166,7 +74,7 @@ const ProfileScreen: React.FC = () => {
       </View>
 
       <View style={styles.avatarContainer}>
-        <TouchableOpacity onPress={handleAvatarPress} disabled={!isEditing}>
+        <TouchableOpacity onPress={handleEditProfile}>
           <UserAvatar
             size={100}
             avatarUrl={user?.avatarUrl}
@@ -174,98 +82,41 @@ const ProfileScreen: React.FC = () => {
             style={styles.avatar}
           />
         </TouchableOpacity>
-        {isEditing && (
-          <Text variant="bodySmall" style={[styles.avatarHint, { color: colors.text }]}>
-            Tap to change avatar
-          </Text>
-        )}
+        <Text variant="bodySmall" style={[styles.avatarHint, { color: colors.text }]}>Tap to edit profile</Text>
       </View>
 
       <Divider style={styles.divider} />
 
-      <View style={styles.form}>
-        <TextInput
-          label="Full Name"
-          value={name}
-          onChangeText={(text) => {
-            setName(text);
-            setError('');
-            setSuccess('');
-          }}
-          mode="outlined"
-          disabled={!isEditing || loading}
-          style={styles.input}
-        />
-
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            setError('');
-            setSuccess('');
-          }}
-          mode="outlined"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          disabled={!isEditing || loading}
-          style={styles.input}
-        />
-
+      <View style={styles.summary}>
+        <View style={styles.summaryRow}>
+          <Text variant="bodyMedium" style={[styles.summaryLabel, styles.summaryLabelText]}>
+            Name
+          </Text>
+          <Text variant="bodyLarge" style={[styles.summaryValue, { color: colors.text }]}>
+            {user?.name ?? '—'}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text variant="bodyMedium" style={[styles.summaryLabel, styles.summaryLabelText]}>
+            Email
+          </Text>
+          <Text variant="bodyLarge" style={[styles.summaryValue, { color: colors.text }]}>
+            {user?.email ?? '—'}
+          </Text>
+        </View>
         {user?.verified !== undefined && (
-          <View style={styles.verificationBadge}>
-            <Text
-              variant="bodyMedium"
-              style={{
-                color: user.verified ? '#4CAF50' : '#FF9800',
-              }}
-            >
-              {user.verified ? '✓ Email Verified' : '⚠ Email Not Verified'}
+          <View style={styles.summaryRow}>
+            <Text variant="bodyMedium" style={[styles.summaryLabel, styles.summaryLabelText]}>
+              Status
+            </Text>
+            <Text variant="bodyLarge" style={[styles.statusText, user.verified ? styles.statusVerified : styles.statusUnverified]}>
+              {user.verified ? 'Email Verified' : 'Email Not Verified'}
             </Text>
           </View>
         )}
-
-        {error ? (
-          <Text variant="bodyMedium" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
-
-        {success ? (
-          <Text variant="bodyMedium" style={styles.successText}>
-            {success}
-          </Text>
-        ) : null}
-
-        {isEditing ? (
-          <View style={styles.buttonRow}>
-            <Button
-              mode="outlined"
-              onPress={handleCancel}
-              disabled={loading}
-              style={styles.buttonHalf}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleSave}
-              loading={loading}
-              disabled={loading}
-              style={styles.buttonHalf}
-            >
-              Save
-            </Button>
-          </View>
-        ) : (
-          <Button
-            mode="contained"
-            onPress={() => setIsEditing(true)}
-            style={styles.button}
-          >
-            Edit Profile
-          </Button>
-        )}
+        <Button mode="contained" onPress={handleEditProfile} style={styles.button}>
+          Edit Profile
+        </Button>
       </View>
 
       <Divider style={styles.divider} />
@@ -300,10 +151,6 @@ const ProfileScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  avatar: {
-    width: 100,
-    height: 100,
-  },
   container: {
     flex: 1,
   },
@@ -320,6 +167,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
+  avatar: {
+    width: 100,
+    height: 100,
+  },
   avatarHint: {
     marginTop: 8,
     opacity: 0.7,
@@ -327,34 +178,46 @@ const styles = StyleSheet.create({
   divider: {
     marginVertical: 24,
   },
-  form: {
+  branding: {
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  brandingText: {
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  summary: {
     marginBottom: 24,
   },
-  input: {
-    marginBottom: 16,
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  verificationBadge: {
-    marginBottom: 16,
+  summaryLabel: {
+    flex: 1,
   },
-  errorText: {
-    color: '#F44336',
-    marginBottom: 16,
+  summaryLabelText: {
+    opacity: 0.7,
   },
-  successText: {
+  summaryValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontWeight: '600',
+  },
+  statusText: {
+    fontWeight: '600',
+  },
+  statusVerified: {
     color: '#4CAF50',
-    marginBottom: 16,
+  },
+  statusUnverified: {
+    color: '#FF9800',
   },
   button: {
     marginTop: 8,
-    paddingVertical: 6,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  buttonHalf: {
-    flex: 1,
     paddingVertical: 6,
   },
   actions: {

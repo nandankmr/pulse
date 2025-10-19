@@ -1,13 +1,13 @@
 // src/screens/GroupSettingsScreen.tsx
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   Image,
   Alert,
+  AlertButton,
 } from 'react-native';
 import {
   Text,
@@ -16,16 +16,14 @@ import {
   Button,
   Divider,
   IconButton,
-  Switch,
   Dialog,
   Portal,
-  Searchbar,
 } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useGroup, useRemoveGroupMember, useCreateInvitation } from '../hooks/useGroups';
-import { useGroupMembers, useUpdateMemberRole, useUpdateGroupDetails } from '../hooks/useChatManagement';
+import { useGroup, useRemoveGroupMember, useCreateInvitation, useDeleteGroup } from '../hooks/useGroups';
+import { useGroupMembers, useUpdateMemberRole } from '../hooks/useChatManagement';
 import { isGroupAdmin } from '../api/group';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -39,122 +37,21 @@ const GroupSettingsScreen: React.FC = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { groupId } = (route.params as RouteParams) || {};
-  
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  const currentUserId = currentUser?.id || '';
 
-  // Fetch group data
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const currentUserId = currentUser?.id ?? '';
+
   const { data: group, isLoading } = useGroup(groupId);
   const { data: membersData, isLoading: membersLoading } = useGroupMembers(groupId);
   const removeMemberMutation = useRemoveGroupMember();
   const updateRoleMutation = useUpdateMemberRole();
-  const updateGroupMutation = useUpdateGroupDetails();
   const createInvitationMutation = useCreateInvitation();
+  const deleteGroupMutation = useDeleteGroup();
 
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
-  const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const isAdmin = group ? isGroupAdmin(group, currentUserId) : false;
-
-  const handleLeaveGroup = () => {
-    setShowLeaveDialog(true);
-  };
-
-  const confirmLeaveGroup = async () => {
-    try {
-      await removeMemberMutation.mutateAsync({
-        groupId,
-        userId: currentUserId,
-      });
-      setShowLeaveDialog(false);
-      navigation.goBack();
-    } catch (error) {
-      console.error('Failed to leave group:', error);
-      Alert.alert('Error', 'Failed to leave group');
-    }
-  };
-
-  const handleRemoveMember = (memberId: string) => {
-    const member = group?.members.find(m => m.userId === memberId);
-    if (!member) return;
-
-    Alert.alert(
-      'Remove Member',
-      `Remove this member from the group?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeMemberMutation.mutateAsync({
-                groupId,
-                userId: memberId,
-              });
-            } catch (error) {
-              console.error('Failed to remove member:', error);
-              Alert.alert('Error', 'Failed to remove member');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleMakeAdmin = async (memberId: string, memberName: string) => {
-    Alert.alert(
-      'Make Admin',
-      `Make ${memberName} a group admin?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Make Admin',
-          onPress: async () => {
-            try {
-              await updateRoleMutation.mutateAsync({
-                chatId: groupId,
-                memberId,
-                data: { role: 'ADMIN' },
-              });
-              Alert.alert('Success', `${memberName} is now an admin`);
-            } catch (error) {
-              console.error('Failed to update role:', error);
-              Alert.alert('Error', 'Failed to update member role');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDemoteMember = async (memberId: string, memberName: string) => {
-    Alert.alert(
-      'Remove Admin',
-      `Remove admin privileges from ${memberName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await updateRoleMutation.mutateAsync({
-                chatId: groupId,
-                memberId,
-                data: { role: 'MEMBER' },
-              });
-              Alert.alert('Success', `${memberName} is now a regular member`);
-            } catch (error) {
-              console.error('Failed to update role:', error);
-              Alert.alert('Error', 'Failed to update member role');
-            }
-          },
-        },
-      ]
-    );
-  };
+  const isAdmin = useMemo(() => (group ? isGroupAdmin(group, currentUserId) : false), [group, currentUserId]);
 
   const handleEditGroup = () => {
     navigation.navigate('EditGroup' as never, { groupId } as never);
@@ -166,28 +63,131 @@ const GroupSettingsScreen: React.FC = () => {
         groupId,
         data: { expiresInHours: 72 },
       });
-      
-      // Create shareable link
+
       const inviteLink = `pulse://join/${groupId}?token=${invitation.token}`;
-      
-      Alert.alert(
-        'Invitation Link',
-        inviteLink,
-        [
-          { text: 'Close', style: 'cancel' },
-          {
-            text: 'Copy',
-            onPress: () => {
-              // TODO: Implement clipboard copy
-              console.log('Copy to clipboard:', inviteLink);
-            },
+      Alert.alert('Invitation Link', inviteLink, [
+        { text: 'Close', style: 'cancel' },
+        {
+          text: 'Copy',
+          onPress: () => {
+            // TODO: Replace with clipboard integration
+            console.log('Copy invite link:', inviteLink);
           },
-        ]
-      );
+        },
+      ]);
     } catch (error) {
       console.error('Failed to generate invite:', error);
       Alert.alert('Error', 'Failed to generate invitation link');
     }
+  };
+
+  const confirmLeaveGroup = async () => {
+    try {
+      await removeMemberMutation.mutateAsync({ groupId, userId: currentUserId });
+      setShowLeaveDialog(false);
+      navigation.goBack();
+    } catch (error) {
+      console.error('Failed to leave group:', error);
+      Alert.alert('Error', 'Failed to leave group');
+    }
+  };
+
+  const confirmDeleteGroup = async () => {
+    try {
+      await deleteGroupMutation.mutateAsync(groupId);
+      setShowDeleteDialog(false);
+      Alert.alert('Group Deleted', 'The group has been deleted successfully.');
+      navigation.reset({ index: 0, routes: [{ name: 'Main' as never }] });
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+      Alert.alert('Error', 'Failed to delete group');
+    }
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    const member = group?.members.find((m) => m.userId === memberId);
+    if (!member) return;
+
+    Alert.alert('Remove Member', `Remove ${member.name} from the group?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeMemberMutation.mutateAsync({ groupId, userId: memberId });
+          } catch (error) {
+            console.error('Failed to remove member:', error);
+            Alert.alert('Error', 'Failed to remove member');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleMakeAdmin = async (memberId: string, memberName: string) => {
+    Alert.alert('Make Admin', `Make ${memberName} a group admin?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Make Admin',
+        onPress: async () => {
+          try {
+            await updateRoleMutation.mutateAsync({ chatId: groupId, memberId, data: { role: 'ADMIN' } });
+            Alert.alert('Success', `${memberName} is now an admin`);
+          } catch (error) {
+            console.error('Failed to promote member:', error);
+            Alert.alert('Error', 'Failed to update member role');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDemoteMember = async (memberId: string, memberName: string) => {
+    Alert.alert('Remove Admin', `Remove admin privileges from ${memberName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await updateRoleMutation.mutateAsync({ chatId: groupId, memberId, data: { role: 'MEMBER' } });
+            Alert.alert('Success', `${memberName} is now a regular member`);
+          } catch (error) {
+            console.error('Failed to demote member:', error);
+            Alert.alert('Error', 'Failed to update member role');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleManageMember = (memberId: string, memberName: string, memberRole: string) => {
+    const buttons: AlertButton[] = [];
+
+    if (memberRole === 'MEMBER') {
+      buttons.push({
+        text: 'Make Admin',
+        onPress: () => handleMakeAdmin(memberId, memberName),
+      });
+    }
+
+    if (memberRole === 'ADMIN') {
+      buttons.push({
+        text: 'Remove Admin',
+        onPress: () => handleDemoteMember(memberId, memberName),
+      });
+    }
+
+    buttons.push({
+      text: 'Remove from Group',
+      style: 'destructive',
+      onPress: () => handleRemoveMember(memberId),
+    });
+
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert('Manage Member', `Manage ${memberName}`, buttons);
   };
 
   if (isLoading || !group) {
@@ -203,7 +203,6 @@ const GroupSettingsScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView>
-        {/* Group Info */}
         <View style={styles.headerSection}>
           {group.avatarUrl ? (
             <Image source={{ uri: group.avatarUrl }} style={styles.groupAvatar} />
@@ -227,12 +226,11 @@ const GroupSettingsScreen: React.FC = () => {
 
         <Divider />
 
-        {/* Group Settings */}
         <View style={styles.section}>
           <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>
             Settings
           </Text>
-          
+
           {isAdmin && (
             <>
               <List.Item
@@ -241,12 +239,20 @@ const GroupSettingsScreen: React.FC = () => {
                 left={() => <List.Icon icon="pencil" />}
                 onPress={handleEditGroup}
               />
-              
+
               <List.Item
                 title="Generate Invite Link"
                 description="Create a link to invite new members"
                 left={() => <List.Icon icon="link" />}
                 onPress={handleGenerateInvite}
+              />
+
+              <List.Item
+                title="Delete Group"
+                titleStyle={{ color: '#F44336' }}
+                description="Permanently remove this group"
+                left={() => <List.Icon icon="trash-can" color="#F44336" />}
+                onPress={() => setShowDeleteDialog(true)}
               />
             </>
           )}
@@ -254,7 +260,6 @@ const GroupSettingsScreen: React.FC = () => {
 
         <Divider />
 
-        {/* Members */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>
@@ -302,28 +307,7 @@ const GroupSettingsScreen: React.FC = () => {
                     canManage ? (
                       <IconButton
                         icon="dots-vertical"
-                        onPress={() => {
-                          Alert.alert(
-                            'Manage Member',
-                            `Manage ${member.name}`,
-                            [
-                              member.role === 'MEMBER' && {
-                                text: 'Make Admin',
-                                onPress: () => handleMakeAdmin(member.id, member.name),
-                              },
-                              member.role === 'ADMIN' && {
-                                text: 'Remove Admin',
-                                onPress: () => handleDemoteMember(member.id, member.name),
-                              },
-                              {
-                                text: 'Remove from Group',
-                                style: 'destructive',
-                                onPress: () => handleRemoveMember(member.id),
-                              },
-                              { text: 'Cancel', style: 'cancel' },
-                            ].filter(Boolean) as any
-                          );
-                        }}
+                        onPress={() => handleManageMember(member.id, member.name, member.role)}
                       />
                     ) : isCurrentUser && member.role === 'ADMIN' ? (
                       <Text variant="bodySmall" style={styles.youBadge}>
@@ -343,18 +327,16 @@ const GroupSettingsScreen: React.FC = () => {
 
         <Divider />
 
-        {/* Actions */}
         <View style={styles.section}>
           <List.Item
             title="Leave Group"
             titleStyle={{ color: '#F44336' }}
             left={() => <List.Icon icon="exit-to-app" color="#F44336" />}
-            onPress={handleLeaveGroup}
+            onPress={() => setShowLeaveDialog(true)}
           />
         </View>
       </ScrollView>
 
-      {/* Leave Group Dialog */}
       <Portal>
         <Dialog visible={showLeaveDialog} onDismiss={() => setShowLeaveDialog(false)}>
           <Dialog.Title>Leave Group?</Dialog.Title>
@@ -365,8 +347,35 @@ const GroupSettingsScreen: React.FC = () => {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setShowLeaveDialog(false)}>Cancel</Button>
-            <Button onPress={confirmLeaveGroup} textColor="#F44336">
+            <Button
+              onPress={confirmLeaveGroup}
+              textColor="#F44336"
+              loading={removeMemberMutation.isPending}
+              disabled={removeMemberMutation.isPending}
+            >
               Leave
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
+          <Dialog.Title>Delete Group?</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">
+              This will permanently delete "{group.name}" for all members. This action cannot be undone.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowDeleteDialog(false)} disabled={deleteGroupMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onPress={confirmDeleteGroup}
+              textColor="#F44336"
+              loading={deleteGroupMutation.isPending}
+              disabled={deleteGroupMutation.isPending}
+            >
+              Delete
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -427,21 +436,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontWeight: 'bold',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  dialogHint: {
-    marginTop: 16,
-    opacity: 0.6,
   },
   loadingText: {
     padding: 16,

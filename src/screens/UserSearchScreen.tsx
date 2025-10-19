@@ -1,7 +1,7 @@
 // src/screens/UserSearchScreen.tsx
 
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet, FlatList, SafeAreaView } from 'react-native';
 import { Searchbar, Text, List, Avatar, ActivityIndicator, Appbar } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
@@ -133,7 +133,7 @@ const UserSearchScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Appbar.Header>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="New Chat" />
@@ -158,7 +158,7 @@ const UserSearchScreen: React.FC = () => {
           filteredUsers.length === 0 ? styles.emptyList : undefined
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

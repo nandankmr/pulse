@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Avatar, Badge } from 'react-native-paper';
-import { useTheme } from '../theme/ThemeContext';
+import { Text, useTheme, Badge } from 'react-native-paper';
+import UserAvatar from './UserAvatar';
 
 export interface Chat {
   id: string;
@@ -47,14 +47,12 @@ const ChatListItem: React.FC<ChatListItemProps> = ({ chat, onPress }) => {
       activeOpacity={0.7}
     >
       <View style={styles.avatarContainer}>
-        {chat.avatar ? (
-          <Avatar.Image size={56} source={{ uri: chat.avatar }} />
-        ) : (
-          <Avatar.Text
-            size={56}
-            label={chat.name.substring(0, 2).toUpperCase()}
-          />
-        )}
+        <UserAvatar
+          size={56}
+          avatarUrl={chat.avatar}
+          name={chat.name}
+          isGroup={chat.isGroup}
+        />
         {!chat.isGroup && chat.isOnline && (
           <View style={[styles.onlineIndicator, { borderColor: colors.background }]} />
         )}
@@ -66,7 +64,7 @@ const ChatListItem: React.FC<ChatListItemProps> = ({ chat, onPress }) => {
             variant="titleMedium"
             style={[
               styles.name,
-              { color: colors.text },
+              { color: colors.onSurface },
               chat.unreadCount > 0 && styles.unreadName,
             ]}
             numberOfLines={1}
@@ -77,7 +75,7 @@ const ChatListItem: React.FC<ChatListItemProps> = ({ chat, onPress }) => {
             variant="bodySmall"
             style={[
               styles.timestamp,
-              { color: colors.text },
+              { color: colors.onSurfaceVariant },
               chat.unreadCount > 0 && styles.unreadTimestamp,
             ]}
           >
@@ -90,7 +88,7 @@ const ChatListItem: React.FC<ChatListItemProps> = ({ chat, onPress }) => {
             variant="bodyMedium"
             style={[
               styles.lastMessage,
-              { color: colors.text },
+              { color: colors.onSurfaceVariant },
               chat.unreadCount > 0 && styles.unreadMessage,
             ]}
             numberOfLines={1}

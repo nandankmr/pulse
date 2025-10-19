@@ -8,23 +8,16 @@ import { store } from '../store';
 
 export type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'LOCATION';
 
-export interface SocketMessage {
-  id: string;
-  senderId: string;
-  receiverId?: string;
-  groupId?: string;
-  conversationId?: string;
-  type: MessageType;
-  content?: string;
-  mediaUrl?: string;
-  location?: {
-    latitude: number;
-    longitude: number;
-  };
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
-}
+export type SystemMessageType =
+  | 'GROUP_CREATED'
+  | 'MEMBER_ADDED'
+  | 'MEMBER_REMOVED'
+  | 'MEMBER_LEFT'
+  | 'MEMBER_PROMOTED'
+  | 'MEMBER_DEMOTED'
+  | 'GROUP_RENAMED'
+  | 'GROUP_DESCRIPTION_UPDATED'
+  | 'GROUP_AVATAR_UPDATED';
 
 export interface SendMessagePayload {
   receiverId?: string;
@@ -38,29 +31,6 @@ export interface SendMessagePayload {
     longitude: number;
   };
   tempId?: string;
-}
-
-export interface SendMessageAck {
-  status: 'ok' | 'error';
-  error?: string;
-  message?: SocketMessage;
-  messageId?: string;
-  tempId?: string;
-}
-
-export interface NewMessageData {
-  message: SocketMessage;
-  tempId?: string;
-  // Convenience fields from message
-  messageId: string;
-  conversationId?: string;
-  groupId?: string;
-  senderId: string;
-  senderName?: string;
-  senderAvatar?: string;
-  content: string;
-  timestamp: string;
-  attachments?: any[];
 }
 
 export interface MarkReadPayload {
@@ -146,7 +116,53 @@ export interface PresenceState {
 }
 
 // Event callback types
-export type MessageNewCallback = (data: { message: SocketMessage; tempId?: string }) => void;
+export interface EnrichedSocketMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string | null;
+  content: string | null;
+  timestamp: string;
+  isRead: boolean;
+  isSent: boolean;
+  type: MessageType;
+  attachments?: AttachmentPayload[];
+  replyTo?: string | null;
+  deliveredTo?: string[];
+  readBy?: string[];
+  participantIds?: string[];
+  editedAt?: string | null;
+  deletedAt?: string | null;
+  systemType?: SystemMessageType | null;
+  metadata?: Record<string, unknown> | null;
+  actorId?: string | null;
+  targetUserId?: string | null;
+}
+
+export interface AttachmentPayload {
+  id: string;
+  type: 'image' | 'video' | 'audio' | 'file' | 'location';
+  url: string;
+  name?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface NewMessagePayload {
+  message: EnrichedSocketMessage;
+  tempId?: string;
+}
+
+export interface SendMessageAck {
+  status: 'ok' | 'error';
+  error?: string;
+  message?: EnrichedSocketMessage;
+  messageId?: string;
+  tempId?: string;
+}
+
+export type MessageNewCallback = (data: NewMessagePayload) => void;
 export type MessageDeliveredCallback = (data: { messageId: string; participantIds: string[] }) => void;
 export type MessageReadCallback = (data: MarkReadPayload & { readerId: string; readAt: string }) => void;
 export type TypingCallback = (data: { userId: string; conversationId?: string; targetUserId?: string; groupId?: string }) => void;
@@ -242,7 +258,7 @@ class SocketManager {
     });
 
     // Message events
-    this.socket.on('message:new', (data: { message: SocketMessage; tempId?: string }) => {
+    this.socket.on('message:new', (data: NewMessagePayload) => {
       console.log('New message received:', data);
       this.emit('message:new', data);
     });
@@ -396,9 +412,12 @@ class SocketManager {
    * Join a group room
    */
   joinGroup(groupId: string) {
-    if (!this.isConnected || !this.socket) return;
+    if (!this.isConnected || !this.socket) {
+      console.warn('⚠️ Cannot join group - socket not connected:', groupId);
+      return;
+    }
     this.socket.emit('group:join', { groupId });
-    console.log('Joined group:', groupId);
+    console.log('✅ Joined group room:', groupId);
   }
 
   /**
@@ -474,10 +493,10 @@ class SocketManager {
   }
 
   /**
-   * Check if socket is connected
+   * Check if socket is connected (method)
    */
-  getConnectionStatus(): boolean {
-    return this.isConnected && this.socket?.connected === true;
+  isSocketConnected() {
+    return this.socket?.connected ?? false;
   }
 
   /**

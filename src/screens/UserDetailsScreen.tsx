@@ -18,7 +18,7 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { RootStackParamList } from '../navigation/types';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import apiClient from '../api/client';

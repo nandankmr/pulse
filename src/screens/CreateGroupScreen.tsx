@@ -21,6 +21,7 @@ import {
   List,
   Switch,
   Divider,
+  ActivityIndicator,
 } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
@@ -47,6 +48,8 @@ const CreateGroupScreen: React.FC = () => {
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [groupAvatar, setGroupAvatar] = useState<string | undefined>();
+  const [groupAvatarRelativePath, setGroupAvatarRelativePath] = useState<string | undefined>();
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<User[]>([]);
@@ -75,9 +78,42 @@ const CreateGroupScreen: React.FC = () => {
     setSelectedMembers(selectedMembers.filter((m) => m.id !== userId));
   };
 
-  const handlePickAvatar = () => {
-    // TODO: Implement avatar picker
-    console.log('Pick group avatar');
+  const handlePickAvatar = async () => {
+    try {
+      const { pickImage, validateImage } = await import('../utils/imagePicker');
+
+      const image = await pickImage();
+      if (!image) return;
+
+      const validation = validateImage(image);
+      if (!validation.valid) {
+        Alert.alert('Error', validation.error || 'Invalid image');
+        return;
+      }
+
+      setAvatarUploading(true);
+
+      try {
+        const { uploadFileToBackend } = await import('../utils/attachmentUpload');
+
+        const { absoluteUrl, relativePath } = await uploadFileToBackend(
+          image.uri,
+          image.name,
+          image.type
+        );
+
+        setGroupAvatar(absoluteUrl);
+        setGroupAvatarRelativePath(relativePath);
+        Alert.alert('Success', 'Group photo uploaded.');
+      } catch (error: any) {
+        console.error('Failed to upload avatar:', error);
+        Alert.alert('Error', error?.message || 'Failed to upload group photo');
+      } finally {
+        setAvatarUploading(false);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to pick image');
+    }
   };
 
   const handleCreateGroup = async () => {
@@ -95,12 +131,24 @@ const CreateGroupScreen: React.FC = () => {
       const response = await createChatMutation.mutateAsync({
         groupName: groupName.trim(),
         memberIds: selectedMembers.map(m => m.id),
-      });
+        ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
+        ...(groupAvatarRelativePath ? { avatar: groupAvatarRelativePath } : {}),
+      } as any);
 
-      // Navigate to the new group chat
-      (navigation as any).navigate('Chat', {
-        chatId: response.chat.id,
-        chatName: response.chat.name,
+      // Replace CreateGroup with Chat screen so navigating back lands on chat list
+      (navigation as any).reset({
+        index: 1,
+        routes: [
+          { name: 'Main' as never },
+          {
+            name: 'Chat' as never,
+            params: {
+              chatId: response.chat.id,
+              chatName: response.chat.name,
+              isGroup: true,
+            } as never,
+          },
+        ],
       });
     } catch (error) {
       console.error('Failed to create group:', error);
@@ -116,14 +164,21 @@ const CreateGroupScreen: React.FC = () => {
       <ScrollView style={styles.scrollView}>
         {/* Group Avatar */}
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.7}>
-            {groupAvatar ? (
-              <Image source={{ uri: groupAvatar }} style={styles.avatarImage} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                <Icon name="camera" size={32} color="#FFFFFF" />
-              </View>
-            )}
+          <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.7} disabled={avatarUploading}>
+            <View>
+              {groupAvatar ? (
+                <Image source={{ uri: groupAvatar }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                  <Icon name="camera" size={32} color="#FFFFFF" />
+                </View>
+              )}
+              {avatarUploading && (
+                <View style={styles.avatarLoadingOverlay}>
+                  <ActivityIndicator animating size="small" color="#FFFFFF" />
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
           <Text variant="bodySmall" style={[styles.avatarHint, { color: colors.text }]}>
             Tap to add group photo
@@ -301,6 +356,17 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },

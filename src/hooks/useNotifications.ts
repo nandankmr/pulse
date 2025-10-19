@@ -35,15 +35,15 @@ export const useMessageNotifications = (currentChatId?: string) => {
     const handleNewMessage = async (data: any) => {
       console.log('🔔 New message for notification check:', data);
 
-      // Extract message data
+      // Backend sends: { message: {...}, tempId?: string }
       const messageData = data.message || data;
-      const messageId = data.messageId || messageData.id;
-      const conversationId = data.conversationId || messageData.conversationId;
-      const groupId = data.groupId || messageData.groupId;
-      const senderId = data.senderId || messageData.senderId;
-      const senderName = data.senderName || messageData.sender?.name || messageData.senderName || 'Someone';
-      const senderAvatar = data.senderAvatar || messageData.sender?.avatarUrl || messageData.senderAvatar;
-      const content = data.content || messageData.content;
+      const messageId = messageData.id;
+      const conversationId = messageData.chatId || messageData.conversationId;
+      const groupId = messageData.chatId;
+      const senderId = messageData.senderId;
+      const senderName = messageData.senderName || messageData.sender?.name || 'Someone';
+      const senderAvatar = messageData.senderAvatar || messageData.sender?.avatarUrl;
+      const content = messageData.content;
       const isGroup = !!groupId;
       const chatId = isGroup ? groupId : conversationId;
 
@@ -98,7 +98,7 @@ export const useClearChatNotifications = (chatId: string) => {
  * Hook to manage badge count based on unread messages
  */
 export const useNotificationBadge = () => {
-  const unreadCount = useSelector((state: RootState) => {
+  const unreadCount = useSelector((_state: RootState) => {
     // Calculate total unread messages across all chats
     // This assumes you have unread counts in your Redux store
     // Adjust based on your actual store structure

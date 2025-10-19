@@ -1,7 +1,7 @@
 // src/screens/HomeScreen.tsx
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, SafeAreaView } from 'react-native';
 import { Text, Searchbar, FAB, Divider, Portal, Dialog, Button, List } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
@@ -14,12 +14,13 @@ const HomeScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
-  const { data, isLoading, refetch, isRefetching } = useChats();
+  const { data, isLoading, refetch } = useChats();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const chats = data?.chats || [];
+  const chats = useMemo(() => data?.chats ?? [], [data]);
 
   // Listen for new messages to update chat list
   useEffect(() => {
@@ -43,6 +44,15 @@ const HomeScreen: React.FC = () => {
       chat.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, chats]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      await refetch({ throwOnError: false });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
 
   const handleChatPress = (chat: Chat) => {
     (navigation as any).navigate('Chat', {
@@ -69,7 +79,7 @@ const HomeScreen: React.FC = () => {
   const unreadCount = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
           Chats
@@ -114,7 +124,7 @@ const HomeScreen: React.FC = () => {
           )}
           ItemSeparatorComponent={() => <Divider />}
           refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
           }
         />
       )}
@@ -152,7 +162,7 @@ const HomeScreen: React.FC = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -165,7 +175,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    paddingTop: 24,
+    paddingTop: 30,
   },
   title: {
     fontWeight: 'bold',

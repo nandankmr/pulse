@@ -17,6 +17,12 @@ export interface PresignedUrlResponse {
   fields?: Record<string, string>;
 }
 
+export interface UploadFileResult {
+  absoluteUrl: string;
+  relativePath: string;
+  filename: string;
+}
+
 /**
  * Upload file directly to backend
  */
@@ -24,8 +30,8 @@ export const uploadFileToBackend = async (
   fileUri: string,
   fileName: string,
   fileType: string,
-  onProgress?: (progress: UploadProgress) => void
-): Promise<string> => {
+  _onProgress?: (progress: UploadProgress) => void
+): Promise<UploadFileResult> => {
   console.log('📤 Starting file upload:', { fileUri, fileName, fileType });
   
   // Get auth token
@@ -72,12 +78,22 @@ export const uploadFileToBackend = async (
     const data = await response.json();
     console.log('✅ Upload successful:', data);
 
-    // Return the full URL
+    const relativePath: string = data.url;
     const baseUrl = config.API_URL.replace('/api', '');
-    const fullUrl = `${baseUrl}${data.url}`;
-    console.log('🔗 Full file URL:', fullUrl);
+    const absoluteUrl = `${baseUrl}${relativePath}`;
+    console.log('🔗 Full file URL:', absoluteUrl);
+
+    let filename = typeof data.filename === 'string' && data.filename.trim() ? data.filename.trim() : undefined;
+    if (!filename) {
+      const segments = relativePath.split('/');
+      filename = segments.pop() || relativePath;
+    }
     
-    return fullUrl;
+    return {
+      absoluteUrl,
+      relativePath,
+      filename,
+    };
   } catch (error: any) {
     console.error('❌ File upload error:', {
       message: error.message,
@@ -95,7 +111,7 @@ export const uploadAttachment = async (
   onProgress?: (progress: UploadProgress) => void
 ): Promise<Attachment> => {
   // Upload file to backend
-  const fileUrl = await uploadFileToBackend(
+  const { absoluteUrl } = await uploadFileToBackend(
     pickedAttachment.uri,
     pickedAttachment.name,
     getMimeType(pickedAttachment.type),
@@ -106,7 +122,7 @@ export const uploadAttachment = async (
   const attachment: Attachment = {
     id: `att_${Date.now()}`,
     type: pickedAttachment.type,
-    url: fileUrl,
+    url: absoluteUrl,
     name: pickedAttachment.name,
     size: pickedAttachment.size,
     duration: pickedAttachment.duration,
@@ -114,7 +130,7 @@ export const uploadAttachment = async (
 
   // Generate thumbnail for videos
   if (pickedAttachment.type === 'video') {
-    attachment.thumbnail = `${fileUrl}_thumb.jpg`;
+    attachment.thumbnail = `${absoluteUrl}_thumb.jpg`;
   }
 
   return attachment;

@@ -1,13 +1,14 @@
 // src/screens/EditGroupScreen.tsx
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { TextInput, Button, Text, Appbar, Avatar } from 'react-native-paper';
+import { TextInput, Button, Text, Appbar, Avatar, ActivityIndicator } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useGroup } from '../hooks/useGroups';
+import { useGroup, useDeleteGroup } from '../hooks/useGroups';
 import { useUpdateGroupDetails } from '../hooks/useChatManagement';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { ensureAbsoluteUrl } from '../utils/url';
 
 interface RouteParams {
   groupId: string;
@@ -21,6 +22,7 @@ const EditGroupScreen: React.FC = () => {
   
   const { data: group, isLoading } = useGroup(groupId);
   const updateGroupMutation = useUpdateGroupDetails();
+  const deleteGroupMutation = useDeleteGroup();
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -29,13 +31,17 @@ const EditGroupScreen: React.FC = () => {
     name: '',
     description: '',
   });
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarRelativePath, setAvatarRelativePath] = useState<string | undefined>();
+  const isPending = useMemo(() => updateGroupMutation.isPending || deleteGroupMutation.isPending, [updateGroupMutation.isPending, deleteGroupMutation.isPending]);
 
   // Initialize form when group data loads
   React.useEffect(() => {
     if (group) {
       setName(group.name || '');
       setDescription(group.description || '');
-      setAvatarUri(group.avatarUrl);
+      setAvatarUri(ensureAbsoluteUrl(group.avatarUrl));
+      setAvatarRelativePath(group.avatarUrl ?? undefined);
     }
   }, [group]);
 
@@ -65,7 +71,7 @@ const EditGroupScreen: React.FC = () => {
     try {
       // Import dynamically to avoid issues if not used
       const { pickImage, validateImage } = await import('../utils/imagePicker');
-      
+
       // Pick image
       const image = await pickImage();
       if (!image) return;
@@ -77,11 +83,26 @@ const EditGroupScreen: React.FC = () => {
         return;
       }
 
-      // TODO: Upload image to server and get URL
-      // For now, just use local URI
-      setAvatarUri(image.uri);
-      
-      Alert.alert('Note', 'Image upload functionality needs to be implemented');
+      setAvatarUploading(true);
+
+      try {
+        const { uploadFileToBackend } = await import('../utils/attachmentUpload');
+
+        const { absoluteUrl, relativePath } = await uploadFileToBackend(
+          image.uri,
+          image.name,
+          image.type
+        );
+
+        setAvatarUri(absoluteUrl);
+        setAvatarRelativePath(relativePath);
+        Alert.alert('Success', 'Group photo uploaded. Remember to save your changes.');
+      } catch (error: any) {
+        console.error('Failed to upload avatar:', error);
+        Alert.alert('Error', error?.message || 'Failed to upload group photo');
+      } finally {
+        setAvatarUploading(false);
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to pick image');
     }
@@ -102,8 +123,8 @@ const EditGroupScreen: React.FC = () => {
         updateData.description = description || undefined;
       }
       
-      if (avatarUri && avatarUri !== group?.avatarUrl) {
-        updateData.avatar = avatarUri;
+      if (avatarRelativePath && avatarRelativePath !== group?.avatarUrl) {
+        updateData.avatar = avatarRelativePath;
       }
 
       // Only update if there are changes
@@ -135,6 +156,36 @@ const EditGroupScreen: React.FC = () => {
     }
   };
 
+  const handleDeleteGroup = () => {
+    Alert.alert(
+      'Delete Group?',
+      'This will permanently delete the group for all members. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: confirmDeleteGroup,
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const confirmDeleteGroup = async () => {
+    try {
+      await deleteGroupMutation.mutateAsync(groupId);
+      Alert.alert('Group Deleted', 'The group has been deleted successfully.');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' as never }],
+      });
+    } catch (error: any) {
+      console.error('Failed to delete group:', error);
+      Alert.alert('Error', error?.message || 'Failed to delete group');
+    }
+  };
+
   if (isLoading || !group) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -163,16 +214,23 @@ const EditGroupScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handleAvatarPress} style={styles.avatarButton}>
-            {avatarUri ? (
-              <Avatar.Image size={100} source={{ uri: avatarUri }} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                <Icon name="account-group" size={48} color="#FFFFFF" />
-              </View>
-            )}
+          <TouchableOpacity onPress={handleAvatarPress} style={styles.avatarButton} disabled={avatarUploading}>
+            <View>
+              {avatarUri ? (
+                <Avatar.Image size={100} source={{ uri: avatarUri }} />
+              ) : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}> 
+                  <Icon name="account-group" size={48} color="#FFFFFF" />
+                </View>
+              )}
+              {avatarUploading && (
+                <View style={styles.avatarLoadingOverlay}>
+                  <ActivityIndicator animating size="small" color="#FFFFFF" />
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
-          <Text variant="bodySmall" style={[styles.avatarHint, { color: colors.text }]}>
+          <Text variant="bodySmall" style={[styles.avatarHint, { color: colors.text }]}> 
             Tap to change group photo
           </Text>
         </View>
@@ -187,7 +245,7 @@ const EditGroupScreen: React.FC = () => {
             }}
             mode="outlined"
             error={!!errors.name}
-            disabled={updateGroupMutation.isPending}
+            disabled={isPending}
             maxLength={50}
             style={styles.input}
           />
@@ -211,7 +269,7 @@ const EditGroupScreen: React.FC = () => {
             multiline
             numberOfLines={4}
             error={!!errors.description}
-            disabled={updateGroupMutation.isPending}
+            disabled={isPending}
             maxLength={200}
             style={styles.input}
           />
@@ -228,10 +286,20 @@ const EditGroupScreen: React.FC = () => {
             mode="contained"
             onPress={handleSave}
             loading={updateGroupMutation.isPending}
-            disabled={updateGroupMutation.isPending}
+            disabled={isPending || avatarUploading}
             style={styles.button}
           >
             Save Changes
+          </Button>
+
+          <Button
+            mode="outlined"
+            onPress={handleDeleteGroup}
+            textColor="#F44336"
+            style={styles.deleteButton}
+            disabled={isPending}
+          >
+            Delete Group
           </Button>
         </View>
       </ScrollView>
@@ -266,6 +334,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   avatarHint: {
     opacity: 0.6,
   },
@@ -286,6 +365,10 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 16,
     paddingVertical: 6,
+  },
+  deleteButton: {
+    marginTop: 12,
+    borderColor: '#F44336',
   },
 });
 

@@ -10,6 +10,8 @@ import {
   UpdateMemberRoleRequest,
 } from '../api/chat';
 import { searchUsersAPI } from '../api/user';
+import { chatKeys } from './useChats';
+import { groupKeys } from './useGroups';
 
 /**
  * Hook for searching users
@@ -49,9 +51,11 @@ export const useUpdateGroupDetails = () => {
       data: UpdateGroupDetailsRequest;
     }) => updateGroupDetailsAPI(chatId, data),
     onSuccess: (_, variables) => {
-      // Invalidate group details and chat list
-      queryClient.invalidateQueries({ queryKey: ['chats', variables.chatId] });
-      queryClient.invalidateQueries({ queryKey: ['chats'] });
+      // Refresh chat list/detail caches and group data after updates
+      queryClient.invalidateQueries({ queryKey: chatKeys.list() });
+      queryClient.invalidateQueries({ queryKey: chatKeys.detail(variables.chatId) });
+      queryClient.invalidateQueries({ queryKey: ['chats', variables.chatId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: groupKeys.detail(variables.chatId) });
     },
   });
 };

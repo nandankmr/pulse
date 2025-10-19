@@ -1,6 +1,6 @@
 // src/screens/ChatScreen.tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -16,7 +16,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { Message, Attachment } from '../types/message';
+import type { Message, MessageType, SystemMessageType, Attachment } from '../types/message';
 import { pickAttachment, validateAttachment, getCurrentLocation } from '../utils/attachmentPicker';
 import { uploadAttachment } from '../utils/attachmentUpload';
 import MessageAttachment from '../components/MessageAttachment';
@@ -27,6 +27,8 @@ import { useMessages, useSendMessage } from '../hooks/useMessages';
 import { socketManager } from '../utils/socketManager';
 import { notificationService } from '../services/notificationService';
 import type {
+  EnrichedSocketMessage,
+  NewMessagePayload,
   MessageEditedData,
   MessageDeletedData,
   GroupMemberAddedData,
@@ -40,15 +42,95 @@ interface RouteParams {
   chatName: string;
 }
 
+const ensureMessageDefaults = (message: Message, currentUserId: string): Message => {
+  const deliveredTo = message.deliveredTo ?? [];
+  const readBy = message.readBy ?? [];
+  const participantIds = message.participantIds ?? [];
+  const attachments = message.attachments ?? [];
+  const content = message.content ?? null;
+  const senderAvatar = message.senderAvatar ?? null;
+  const replyTo = message.replyTo ?? null;
+  const editedAt = message.editedAt ?? null;
+  const deletedAt = message.deletedAt ?? null;
+  const type: MessageType = message.type ?? 'TEXT';
+  const systemType: SystemMessageType | null = message.systemType ?? null;
+  const metadata = ((): Record<string, unknown> | null => {
+    if (!message.metadata) {
+      return null;
+    }
+    return message.metadata;
+  })();
+  const actorId = message.actorId ?? null;
+  const targetUserId = message.targetUserId ?? null;
+
+  return {
+    ...message,
+    content,
+    senderAvatar,
+    attachments,
+    replyTo,
+    editedAt,
+    deletedAt,
+    deliveredTo,
+    readBy,
+    participantIds,
+    type,
+    systemType,
+    metadata,
+    actorId,
+    targetUserId,
+    isRead: message.isRead || readBy.includes(currentUserId) || message.senderId === currentUserId,
+  };
+};
+
+const normalizeSocketMessage = (payload: EnrichedSocketMessage, currentUserId: string): Message =>
+  ensureMessageDefaults(
+    {
+      id: payload.id,
+      chatId: payload.chatId,
+      senderId: payload.senderId,
+      senderName: payload.senderName,
+      senderAvatar: payload.senderAvatar ?? null,
+      content: payload.content ?? null,
+      timestamp: payload.timestamp,
+      isRead: payload.isRead,
+      isSent: payload.isSent,
+      type: payload.type,
+      attachments: payload.attachments ?? [],
+      replyTo: payload.replyTo ?? null,
+      editedAt: payload.editedAt ?? null,
+      deletedAt: payload.deletedAt ?? null,
+      deliveredTo: payload.deliveredTo ?? [],
+      readBy: payload.readBy ?? [],
+      participantIds: payload.participantIds ?? [],
+      systemType: payload.systemType ?? null,
+      metadata: payload.metadata ?? null,
+      actorId: payload.actorId ?? null,
+      targetUserId: payload.targetUserId ?? null,
+    },
+    currentUserId
+  );
+
+const HeaderAvatarButton: React.FC<{
+  onPress: () => void;
+  avatarUrl?: string | null;
+  name: string;
+  isGroup: boolean;
+}> = ({ onPress, avatarUrl, name, isGroup }) => (
+  <TouchableOpacity onPress={onPress} style={styles.headerButton}>
+    <UserAvatar size={36} avatarUrl={avatarUrl} name={name} isGroup={isGroup} />
+  </TouchableOpacity>
+);
+
 const ChatScreen: React.FC = () => {
   const { colors } = useTheme();
   const route = useRoute();
   const navigation = useNavigation();
   const { chatId, chatName } = (route.params as RouteParams) || {};
-  const markAsReadMutation = useMarkChatAsRead();
+  const { mutate: markChatAsRead } = useMarkChatAsRead();
   const { data: chatInfo } = useChat(chatId);
   const { markMessagesAsRead, editMessage, deleteMessage } = useMessageOperations();
-  const { data: messagesData, isLoading, refetch } = useMessages(chatId);
+  const { data: messagesData, isLoading } = useMessages(chatId);
   const sendMessageMutation = useSendMessage();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -62,9 +144,11 @@ const ChatScreen: React.FC = () => {
   const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUserId, setTypingUserId] = useState<string | null>(null);
-  const [typingUserName, setTypingUserName] = useState<string | null>(null);
+  const [typingUserName, setTypingUserName] = useState<string>('');
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markedMessageIdsRef = useRef<Set<string>>(new Set());
+  const typingUserIdRef = useRef<string | null>(null);
 
   // Get current user ID from Redux store
   const currentUser = useSelector((state: RootState) => state.auth.user);
@@ -73,7 +157,7 @@ const ChatScreen: React.FC = () => {
   const isGroupChat = chatInfo?.isGroup ?? false;
 
   // Handle header press to navigate to details
-  const handleHeaderPress = () => {
+  const handleHeaderPress = useCallback(() => {
     if (isGroupChat) {
       navigation.navigate('GroupDetails', {
         groupId: chatId,
@@ -91,129 +175,321 @@ const ChatScreen: React.FC = () => {
         userId: otherUserId,
       });
     }
-  };
+  }, [chatId, chatInfo?.avatar, chatInfo?.otherUserId, groupName, isGroupChat, navigation]);
+
+  useEffect(() => {
+    typingUserIdRef.current = typingUserId;
+  }, [typingUserId]);
+
+  useEffect(() => {
+    markedMessageIdsRef.current.clear();
+  }, [chatId]);
+
+  const buildOptimisticMessage = useCallback(
+    (overrides: Partial<Message> & { id: string; content: string | null }) => {
+      const baseTimestamp = overrides.timestamp ?? new Date().toISOString();
+      const attachmentList = overrides.attachments ?? [];
+      const delivered = overrides.deliveredTo ?? [];
+      const read = overrides.readBy ?? (currentUserId ? [currentUserId] : []);
+      const participants = overrides.participantIds ?? (currentUserId ? [currentUserId] : []);
+
+      return ensureMessageDefaults(
+        {
+          id: overrides.id,
+          chatId,
+          senderId: currentUserId,
+          senderName: currentUser?.name ?? 'You',
+          senderAvatar: currentUser?.avatarUrl ?? null,
+          content: overrides.content,
+          timestamp: baseTimestamp,
+          isRead: true,
+          isSent: overrides.isSent ?? false,
+          type: overrides.type ?? 'TEXT',
+          attachments: attachmentList,
+          replyTo: overrides.replyTo ?? null,
+          editedAt: overrides.editedAt ?? null,
+          deletedAt: overrides.deletedAt ?? null,
+          deliveredTo: delivered,
+          readBy: read,
+          participantIds: participants,
+          systemType: overrides.systemType ?? null,
+          metadata: overrides.metadata ?? null,
+          actorId: overrides.actorId ?? null,
+          targetUserId: overrides.targetUserId ?? null,
+        },
+        currentUserId
+      );
+    },
+    [chatId, currentUser?.avatarUrl, currentUser?.name, currentUserId]
+  );
+
+  const getSystemMessageText = useCallback(
+    (message: Message): string => {
+      if (!message.systemType) {
+        return message.content ?? '';
+      }
+
+      const metadata = message.metadata ?? null;
+      const getMetadataValue = (key: string): string | undefined => {
+        if (!metadata) {
+          return undefined;
+        }
+        const value = metadata[key];
+        return typeof value === 'string' ? value : undefined;
+      };
+
+      const actorName = getMetadataValue('actorName') ?? message.senderName ?? 'Someone';
+      const targetName = getMetadataValue('targetUserName');
+
+      const lower = (value?: string | null) => (value ? value.toLowerCase() : undefined);
+
+      switch (message.systemType) {
+        case 'GROUP_CREATED':
+          return `${actorName} created the group.`;
+        case 'MEMBER_ADDED':
+          if (targetName && targetName !== actorName) {
+            return `${actorName} added ${targetName}.`;
+          }
+          if (targetName) {
+            return `${targetName} joined the group.`;
+          }
+          return `${actorName} added a new member.`;
+        case 'MEMBER_REMOVED':
+          return targetName ? `${actorName} removed ${targetName}.` : `${actorName} removed a member.`;
+        case 'MEMBER_LEFT':
+          return `${actorName} left the group.`;
+        case 'MEMBER_PROMOTED': {
+          const newRole = lower(getMetadataValue('newRole')) ?? 'admin';
+          return targetName
+            ? `${actorName} promoted ${targetName} to ${newRole}.`
+            : `${actorName} promoted a member to ${newRole}.`;
+        }
+        case 'MEMBER_DEMOTED': {
+          const newRole = lower(getMetadataValue('newRole')) ?? 'member';
+          return targetName
+            ? `${actorName} changed ${targetName}'s role to ${newRole}.`
+            : `${actorName} changed a member's role to ${newRole}.`;
+        }
+        case 'GROUP_RENAMED': {
+          const previousName = getMetadataValue('previousName');
+          const newName = getMetadataValue('newName');
+          if (previousName && newName) {
+            return `${actorName} renamed the group from ${previousName} to ${newName}.`;
+          }
+          return `${actorName} renamed the group.`;
+        }
+        case 'GROUP_DESCRIPTION_UPDATED': {
+          const newDescription = getMetadataValue('newDescription');
+          if (newDescription && newDescription.trim().length > 0) {
+            return `${actorName} updated the group description.`;
+          }
+          return `${actorName} cleared the group description.`;
+        }
+        case 'GROUP_AVATAR_UPDATED':
+          return `${actorName} updated the group avatar.`;
+        default:
+          return message.content ?? '';
+      }
+    },
+    []
+  );
+
+  const getMessageStatus = useCallback(
+    (message: Message) => {
+      if (message.senderId !== currentUserId) {
+        return null;
+      }
+
+      if (!message.isSent) {
+        return { icon: '⌛', color: '#FFFFFF', label: 'Sending' };
+      }
+
+      const others = (message.participantIds ?? []).filter((id) => id !== currentUserId);
+      if (others.length === 0) {
+        return { icon: '✓', color: '#FFFFFF', label: 'Sent' };
+      }
+
+      const deliveredSet = new Set((message.deliveredTo ?? []).filter((id) => id !== currentUserId));
+      const readSet = new Set((message.readBy ?? []).filter((id) => id !== currentUserId));
+
+      const allDelivered = others.every((id) => deliveredSet.has(id));
+      const allRead = others.every((id) => readSet.has(id));
+
+      if (allRead) {
+        return { icon: '✓✓', color: '#4CAF50', label: 'Read' };
+      }
+
+      if (allDelivered) {
+        return { icon: '✓✓', color: 'rgba(255,255,255,0.85)', label: 'Delivered' };
+      }
+
+      return { icon: '✓', color: 'rgba(255,255,255,0.85)', label: 'Sent' };
+    },
+    [currentUserId]
+  );
 
   // Load messages from API
   useEffect(() => {
     if (messagesData?.messages) {
-      setMessages(messagesData.messages);
+      const normalizedMessages = messagesData.messages.map((msg) => ensureMessageDefaults(msg, currentUserId));
+      setMessages(normalizedMessages);
       // Scroll to bottom when messages first load
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: false });
       }, 100);
     }
-  }, [messagesData]);
+  }, [messagesData, currentUserId]);
 
   useEffect(() => {
-    // Mark chat as read when opening
-    if (chatId) {
-      markAsReadMutation.mutate(chatId);
-      // Clear notifications for this chat
-      notificationService.cancelChatNotifications(chatId);
+    if (!chatId) {
+      return;
     }
-    
-    // Set header with clickable title
+
+    markChatAsRead(chatId);
+    notificationService.cancelChatNotifications(chatId);
+  }, [chatId, markChatAsRead]);
+
+  useEffect(() => {
     navigation.setOptions({
       title: groupName,
       headerRight: () => (
-        <TouchableOpacity
+        <HeaderAvatarButton
           onPress={handleHeaderPress}
-          style={{ marginRight: 16 }}
-        >
-          <UserAvatar
-            size={36}
-            avatarUrl={chatInfo?.avatar}
-            name={groupName}
-            isGroup={isGroupChat}
-          />
-        </TouchableOpacity>
+          avatarUrl={chatInfo?.avatar}
+          name={groupName}
+          isGroup={isGroupChat}
+        />
       ),
     });
-  }, [chatId, groupName, chatInfo, isGroupChat]);
+  }, [chatInfo?.avatar, groupName, handleHeaderPress, isGroupChat, navigation]);
 
-  // Join chat room for real-time updates
-  useEffect(() => {
-    if (isGroupChat) {
-      console.log('🔌 Joining group room:', chatId);
-      socketManager.joinGroup(chatId);
-      
-      return () => {
-        console.log('🔌 Leaving group room:', chatId);
-        socketManager.leaveGroup(chatId);
-      };
-    }
-  }, [chatId, isGroupChat]);
+  // Note: Users are automatically joined to all their groups on socket connection
+  // No need to manually join/leave group rooms here
 
   // Socket.IO Event Listeners
   useEffect(() => {
     // New message received
-    const handleNewMessage = (data: any) => {
-      console.log('📨 New message received:', data);
-      
-      // Handle both formats: direct fields or nested message object
-      const messageData = data.message || data;
-      const messageId = data.messageId || messageData.id;
-      const conversationId = data.conversationId || messageData.conversationId;
-      const senderId = data.senderId || messageData.senderId;
-      
-      // Extract sender info from enriched message
-      const senderName = data.senderName || messageData.sender?.name || messageData.senderName || 'Unknown';
-      const senderAvatar = data.senderAvatar || messageData.sender?.avatarUrl || messageData.senderAvatar;
-      
-      const content = data.content || messageData.content;
-      const timestamp = data.timestamp || messageData.createdAt;
-      const attachments = data.attachments || messageData.attachments;
-      const tempId = data.tempId;
-      
-      const groupId = data.groupId || messageData.groupId;
-      
-      console.log('📨 Parsed message:', { messageId, senderId, senderName, conversationId, groupId, chatId, isGroupChat });
-      console.log('📨 Chat matching - isGroupChat:', isGroupChat, 'groupId === chatId:', groupId === chatId, 'conversationId === chatId:', conversationId === chatId);
+    const handleNewMessage = ({ message, tempId }: NewMessagePayload) => {
+      console.log('📨 New message received:', { message, tempId });
 
-      // For group chats, match by groupId. For DMs, match by conversationId
-      const isSameChat = isGroupChat ? groupId === chatId : conversationId === chatId;
+      const normalizedMessage = normalizeSocketMessage(message, currentUserId);
 
-      if (isSameChat) {
-        // Check if this is our own message
-        const isOwnMessage = senderId === currentUserId;
-        
-        const newMessage: Message = {
-          id: messageId,
-          chatId: conversationId,
-          senderId: senderId,
-          senderName: senderName || 'Unknown',
-          senderAvatar: senderAvatar,
-          content: content,
-          timestamp: timestamp,
-          isRead: isOwnMessage, // Own messages are already "read"
-          isSent: true,
-          attachments: attachments,
-        };
-        
-        // If tempId exists, replace optimistic message
-        if (tempId) {
-          setMessages(prev => prev.map(msg => 
-            msg.id === tempId ? newMessage : msg
-          ));
-        } else {
-          // New message from another user
-          setMessages(prev => [...prev, newMessage]);
-          // Scroll to bottom when new message arrives
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }, 100);
-        }
-        
-        // Mark as read if not from current user
-        if (!isOwnMessage) {
-          markMessagesAsRead(
-            [messageId],
-            undefined,
-            isGroupChat ? chatId : undefined,
-            !isGroupChat ? chatId : undefined
-          );
-        }
+      if (normalizedMessage.chatId !== chatId) {
+        return;
       }
+
+      const isOwnMessage = normalizedMessage.senderId === currentUserId;
+
+      if (normalizedMessage.senderId === typingUserIdRef.current) {
+        setIsTyping(false);
+        setTypingUserId(null);
+        setTypingUserName('');
+      }
+
+      if (tempId) {
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === tempId ? normalizedMessage : msg))
+        );
+      } else {
+        setMessages((prev) => {
+          if (isOwnMessage) {
+            const tempIndex = prev.findIndex((msg) =>
+              msg.id.startsWith('temp-') &&
+              msg.senderId === currentUserId &&
+              msg.content === normalizedMessage.content
+            );
+
+            if (tempIndex !== -1) {
+              const updated = [...prev];
+              updated[tempIndex] = normalizedMessage;
+              return updated;
+            }
+          }
+
+          return [...prev, normalizedMessage];
+        });
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+
+      if (!isOwnMessage && !markedMessageIdsRef.current.has(normalizedMessage.id)) {
+        const targetUserId = isGroupChat ? undefined : normalizedMessage.senderId;
+        markMessagesAsRead(
+          [normalizedMessage.id],
+          targetUserId,
+          isGroupChat ? chatId : undefined,
+          !isGroupChat ? chatId : undefined
+        );
+        markedMessageIdsRef.current.add(normalizedMessage.id);
+      }
+    };
+
+    const handleMessageDelivered = ({ messageId, participantIds }: { messageId: string; participantIds: string[] }) => {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId) {
+            return msg;
+          }
+
+          const deliveredSet = new Set(msg.deliveredTo ?? []);
+          participantIds.forEach((id) => {
+            if (id !== msg.senderId) {
+              deliveredSet.add(id);
+            }
+          });
+
+          const mergedParticipants = Array.from(new Set([...(msg.participantIds ?? []), ...participantIds]));
+
+          return ensureMessageDefaults(
+            {
+              ...msg,
+              deliveredTo: Array.from(deliveredSet),
+              participantIds: mergedParticipants,
+              isSent: true,
+            },
+            currentUserId
+          );
+        })
+      );
+    };
+
+    const applyReadReceipt = (messageId: string, readerId: string) => {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId) {
+            return msg;
+          }
+
+          const readSet = new Set(msg.readBy ?? []);
+          readSet.add(readerId);
+
+          const updated = {
+            ...msg,
+            readBy: Array.from(readSet),
+          };
+
+          if (readerId === currentUserId) {
+            updated.isRead = true;
+          }
+
+          return ensureMessageDefaults(updated, currentUserId);
+        })
+      );
+    };
+
+    const handleMessageRead = (data: { messageId?: string; messageIds?: string[]; readerId: string }) => {
+      if (data.messageId) {
+        applyReadReceipt(data.messageId, data.readerId);
+      }
+
+      if (Array.isArray(data.messageIds)) {
+        data.messageIds.forEach((id) => applyReadReceipt(id, data.readerId));
+      }
+    };
+
+    const handleMessageReadConfirmed = (data: { messageId: string; readerId: string }) => {
+      applyReadReceipt(data.messageId, data.readerId);
     };
 
 
@@ -245,50 +521,16 @@ const ChatScreen: React.FC = () => {
     // Group member added
     const handleMemberAdded = (data: GroupMemberAddedData) => {
       console.log('Member added:', data);
-      // Add system message
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        chatId: data.groupId,
-        senderId: 'system',
-        senderName: 'System',
-        content: '👤 A new member joined the group',
-        timestamp: new Date().toISOString(),
-        isRead: true,
-        isSent: true,
-      };
-      setMessages(prev => [...prev, systemMessage]);
     };
 
     // Group member removed
     const handleMemberRemoved = (data: GroupMemberRemovedData) => {
       console.log('Member removed:', data);
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        chatId: data.groupId,
-        senderId: 'system',
-        senderName: 'System',
-        content: '👋 A member left the group',
-        timestamp: new Date().toISOString(),
-        isRead: true,
-        isSent: true,
-      };
-      setMessages(prev => [...prev, systemMessage]);
     };
 
     // Group member role changed
     const handleRoleChanged = (data: GroupMemberRoleChangedData) => {
       console.log('Member role changed:', data);
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        chatId: data.groupId,
-        senderId: 'system',
-        senderName: 'System',
-        content: `👑 A member is now ${data.role === 'ADMIN' ? 'an admin' : 'a regular member'}`,
-        timestamp: new Date().toISOString(),
-        isRead: true,
-        isSent: true,
-      };
-      setMessages(prev => [...prev, systemMessage]);
     };
 
     // Group updated
@@ -298,31 +540,21 @@ const ChatScreen: React.FC = () => {
         setGroupName(data.name);
         navigation.setOptions({ title: data.name });
       }
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
-        chatId: data.groupId,
-        senderId: 'system',
-        senderName: 'System',
-        content: '✏️ Group details were updated',
-        timestamp: new Date().toISOString(),
-        isRead: true,
-        isSent: true,
-      };
-      setMessages(prev => [...prev, systemMessage]);
+      // System message will arrive from backend via socket
     };
 
     // Typing indicators
     const handleTypingStart = (data: any) => {
       console.log('⌨️ Typing start:', data);
-      const { userId, userName, conversationId: typingConvId, groupId: typingGroupId } = data;
+      const { userId, userName, targetUserId, groupId: typingGroupId } = data;
       
       // Only show typing if it's from another user in this chat
       if (userId !== currentUserId) {
-        const isThisChat = isGroupChat ? typingGroupId === chatId : typingConvId === chatId;
+        const isThisChat = isGroupChat ? typingGroupId === chatId : targetUserId === currentUserId;
         if (isThisChat) {
           setIsTyping(true);
           setTypingUserId(userId);
-          setTypingUserName(userName || 'Someone');
+          setTypingUserName(userName && userName.trim().length > 0 ? userName : 'Someone');
         }
       }
     };
@@ -330,15 +562,19 @@ const ChatScreen: React.FC = () => {
     const handleTypingStop = (data: any) => {
       console.log('⌨️ Typing stop:', data);
       const { userId } = data;
+      console.log('Typing stop for user:', userId, 'typingUserId:', typingUserId);
       if (userId === typingUserId) {
         setIsTyping(false);
         setTypingUserId(null);
-        setTypingUserName(null);
+        setTypingUserName('');
       }
     };
 
     // Register event listeners
     socketManager.on('message:new', handleNewMessage);
+    socketManager.on('message:delivered', handleMessageDelivered);
+    socketManager.on('message:read', handleMessageRead);
+    socketManager.on('message:read:confirmed', handleMessageReadConfirmed);
     socketManager.on('message:edited', handleMessageEdited);
     socketManager.on('message:deleted', handleMessageDeleted);
     socketManager.on('group:member:added', handleMemberAdded);
@@ -351,6 +587,9 @@ const ChatScreen: React.FC = () => {
     // Cleanup
     return () => {
       socketManager.off('message:new', handleNewMessage);
+      socketManager.off('message:delivered', handleMessageDelivered);
+      socketManager.off('message:read', handleMessageRead);
+      socketManager.off('message:read:confirmed', handleMessageReadConfirmed);
       socketManager.off('message:edited', handleMessageEdited);
       socketManager.off('message:deleted', handleMessageDeleted);
       socketManager.off('group:member:added', handleMemberAdded);
@@ -360,26 +599,42 @@ const ChatScreen: React.FC = () => {
       socketManager.off('typing:start', handleTypingStart);
       socketManager.off('typing:stop', handleTypingStop);
     };
-  }, [navigation, chatId, currentUserId, isGroupChat, markMessagesAsRead]);
+  }, [chatId, chatInfo?.otherUserId, currentUserId, isGroupChat, markMessagesAsRead, navigation, typingUserId]);
 
   // Bulk read receipts - mark all unread messages as read when opening chat
   useEffect(() => {
+    markedMessageIdsRef.current.clear();
+  }, [chatId]);
+
+  useEffect(() => {
     const unreadMessages = messages.filter(msg => !msg.isRead && msg.senderId !== currentUserId);
-    if (unreadMessages.length > 0) {
-      const unreadIds = unreadMessages.map(msg => msg.id);
-      // Mark as read via Socket.IO
+    if (unreadMessages.length === 0) {
+      return;
+    }
+
+    const unreadIds = unreadMessages
+      .map(msg => msg.id)
+      .filter(id => !markedMessageIdsRef.current.has(id));
+
+    if (unreadIds.length > 0) {
+      const targetUserId = isGroupChat ? undefined : chatInfo?.otherUserId ?? unreadMessages[0]?.senderId;
       markMessagesAsRead(
         unreadIds,
-        undefined,
+        targetUserId,
         isGroupChat ? chatId : undefined,
         !isGroupChat ? chatId : undefined
       );
-      // Update local state
-      setMessages(prev => prev.map(msg => 
-        unreadIds.includes(msg.id) ? { ...msg, isRead: true } : msg
+      unreadIds.forEach((id) => markedMessageIdsRef.current.add(id));
+    }
+
+    const markIdsSet = new Set(unreadMessages.map((msg) => msg.id));
+    if (markIdsSet.size > 0) {
+      markIdsSet.forEach((id) => markedMessageIdsRef.current.add(id));
+      setMessages(prev => prev.map(msg =>
+        markIdsSet.has(msg.id) ? { ...msg, isRead: true } : msg
       ));
     }
-  }, [messages, isGroupChat, chatId, currentUserId, markMessagesAsRead]);
+  }, [messages, isGroupChat, chatId, currentUserId, chatInfo?.otherUserId, markMessagesAsRead]);
 
   // Handle keyboard events to scroll to bottom
   useEffect(() => {
@@ -460,18 +715,36 @@ const ChatScreen: React.FC = () => {
     const tempId = `temp-${Date.now()}`;
     const messageContent = inputText.trim() || (location ? 'Shared location' : 'Sent attachment');
 
-    // Optimistic update
-    const tempMessage: Message = {
-      id: tempId,
-      chatId,
-      senderId: currentUserId,
-      senderName: 'You',
-      content: messageContent,
-      timestamp: new Date().toISOString(),
-      isRead: false,
-      isSent: false,
-      attachments,
+    const mapAttachmentTypeToMessageType = (att?: Attachment): MessageType => {
+      if (!att) {
+        return location ? 'LOCATION' : 'TEXT';
+      }
+
+      switch (att.type) {
+        case 'image':
+          return 'IMAGE';
+        case 'video':
+          return 'VIDEO';
+        case 'audio':
+          return 'AUDIO';
+        case 'file':
+          return 'FILE';
+        case 'location':
+          return 'LOCATION';
+        default:
+          return 'TEXT';
+      }
     };
+
+    const resolvedType: MessageType = mapAttachmentTypeToMessageType(attachment);
+
+    const tempMessage = buildOptimisticMessage({
+      id: tempId,
+      content: messageContent,
+      attachments,
+      isSent: false,
+      type: resolvedType,
+    });
 
     setMessages((prev) => [...prev, tempMessage]);
     setInputText('');
@@ -482,7 +755,7 @@ const ChatScreen: React.FC = () => {
         chatId,
         content: messageContent,
         mediaUrl: attachment?.url,
-        type: attachment ? attachment.type.toUpperCase() as any : location ? 'LOCATION' : 'TEXT',
+        type: resolvedType,
         location,
       });
 
@@ -554,17 +827,11 @@ const ChatScreen: React.FC = () => {
     setInputText('');
     setSending(true);
 
-    // Optimistic update
-    const tempMessage: Message = {
+    const tempMessage = buildOptimisticMessage({
       id: tempId,
-      chatId,
-      senderId: currentUserId,
-      senderName: 'You',
       content: messageContent,
-      timestamp: new Date().toISOString(),
-      isRead: false,
       isSent: false,
-    };
+    });
 
     setMessages((prev) => [...prev, tempMessage]);
     
@@ -605,14 +872,15 @@ const ChatScreen: React.FC = () => {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwnMessage = item.senderId === currentUserId;
-    const isSystemMessage = item.senderId === 'system';
+    const isSystemMessage = Boolean(item.systemType);
 
     // System messages (group events)
     if (isSystemMessage) {
+      const systemText = getSystemMessageText(item);
       return (
         <View style={styles.systemMessageContainer}>
           <Text variant="bodySmall" style={styles.systemMessageText}>
-            {item.content}
+            {systemText}
           </Text>
         </View>
       );
@@ -695,11 +963,17 @@ const ChatScreen: React.FC = () => {
             >
               {formatMessageTime(item.timestamp)}
             </Text>
-            {isOwnMessage && (
-              <Text style={[styles.status, { color: '#FFFFFF' }]}>
-                {item.isSent ? '✓✓' : '✓'}
-              </Text>
-            )}
+            {(() => {
+              const status = getMessageStatus(item);
+              if (!status) {
+                return null;
+              }
+              return (
+                <Text style={[styles.status, { color: status.color }]} accessibilityLabel={status.label}>
+                  {status.icon}
+                </Text>
+              );
+            })()}
           </View>
         </View>
       </View>
@@ -773,7 +1047,7 @@ const ChatScreen: React.FC = () => {
   // Handle edit message
   const handleEditMessage = (message: Message) => {
     setEditingMessage(message);
-    setEditText(message.content);
+    setEditText(message.content ?? '');
   };
 
   // Save edited message
@@ -837,7 +1111,7 @@ const ChatScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {isLoading ? (
@@ -1053,6 +1327,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 8,
+    paddingBottom: 16,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },

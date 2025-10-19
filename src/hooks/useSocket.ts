@@ -2,12 +2,14 @@
 
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import { RootState } from '../store';
-import { socketManager } from '../utils/socketManager';
+import { socketManager, type GroupMemberAddedData } from '../utils/socketManager';
+import { chatKeys } from './useChats';
 import type {
   SendMessagePayload,
   SendMessageAck,
-  SocketMessage,
+  EnrichedSocketMessage,
   MarkReadPayload,
   TypingPayload,
   PresenceUpdate,
@@ -28,6 +30,8 @@ export const useSocketConnection = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated, accessToken } = useSelector((state: RootState) => state.auth);
+  const currentUserId = useSelector((state: RootState) => state.auth.user?.id);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     console.log('🔄 useSocketConnection effect - isAuthenticated:', isAuthenticated, 'hasToken:', !!accessToken);
@@ -72,6 +76,28 @@ export const useSocketConnection = () => {
       socketManager.off('connect_error', handleError);
     };
   }, [isAuthenticated, accessToken]); // Re-run when auth state changes
+
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken || !currentUserId) {
+      return;
+    }
+
+    const handleGroupMemberAdded = (payload: GroupMemberAddedData) => {
+      if (payload.userId !== currentUserId) {
+        return;
+      }
+
+      socketManager.joinGroup(payload.groupId);
+      queryClient.invalidateQueries({ queryKey: chatKeys.list() });
+      queryClient.invalidateQueries({ queryKey: chatKeys.detail(payload.groupId) });
+    };
+
+    socketManager.on('group:member:added', handleGroupMemberAdded);
+
+    return () => {
+      socketManager.off('group:member:added', handleGroupMemberAdded);
+    };
+  }, [isAuthenticated, accessToken, currentUserId, queryClient]);
 
   return { isConnected, error };
 };
@@ -303,7 +329,7 @@ export const useChatSocket = (
   isGroup: boolean,
   currentUserId: string
 ) => {
-  const [messages, setMessages] = useState<SocketMessage[]>([]);
+  const [messages, setMessages] = useState<EnrichedSocketMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
 
   // Join group room if it's a group chat

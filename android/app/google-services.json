@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "153615332965",
+    "project_id": "agastya-6467d",
+    "storage_bucket": "agastya-6467d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:153615332965:android:58daf526ed86880cba388c",
+        "android_client_info": {
+          "package_name": "com.pulse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCiYtDkS75FoHARON3aDz9PZi8gT7mjU3w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

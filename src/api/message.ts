@@ -63,9 +63,12 @@ export const sendMessageAPI = async (
  */
 export const deleteMessageAPI = async (
   chatId: string,
-  messageId: string
+  messageId: string,
+  deleteForEveryone?: boolean
 ): Promise<void> => {
-  await apiClient.delete(`/chats/${chatId}/messages/${messageId}`);
+  await apiClient.delete(`/chats/${chatId}/messages/${messageId}`, {
+    data: { deleteForEveryone },
+  });
 };
 
 /**

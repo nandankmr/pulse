@@ -1,11 +1,24 @@
 // src/services/notificationService.ts
 
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import notifee, {
+  AndroidImportance,
+  EventType,
+  Notification,
+  InitialNotification,
+} from '@notifee/react-native';
 import { Platform } from 'react-native';
 
+export interface NotificationPressPayload {
+  chatId: string;
+  chatName?: string;
+  isGroup?: boolean;
+  messageId?: string;
+}
+
 class NotificationService {
-  private channelId = 'pulse-messages';
+  private channelId = 'pulse_default_channel';
   private initialized = false;
+  private notificationPressListeners = new Set<(payload: NotificationPressPayload) => void>();
 
   /**
    * Initialize notification service
@@ -74,9 +87,10 @@ class NotificationService {
     senderAvatar?: string;
     content: string;
     isGroup?: boolean;
+    chatName?: string;
   }) {
     try {
-      const { messageId, chatId, senderName, content, isGroup } = params;
+      const { messageId, chatId, senderName, content, isGroup, chatName } = params;
 
       // Don't show notification if app is in foreground and chat is open
       // This will be handled by the caller
@@ -95,7 +109,8 @@ class NotificationService {
           // Group notifications by chat
           groupId: chatId,
           groupSummary: false,
-          smallIcon: 'ic_notification',
+          // Use default icon if custom icon doesn't exist
+          smallIcon: 'ic_launcher',
           sound: 'default',
           vibrationPattern: [300, 500],
           // Add action buttons
@@ -125,6 +140,7 @@ class NotificationService {
           messageId,
           chatId,
           senderName,
+          chatName: chatName ?? senderName,
           isGroup: isGroup ? 'true' : 'false',
         },
       });
@@ -234,7 +250,7 @@ class NotificationService {
 
       if (type === EventType.PRESS) {
         console.log('🔔 Notification pressed:', detail.notification?.data);
-        // Navigation will be handled by the app
+        this.handleNotificationPress(detail.notification);
       } else if (type === EventType.ACTION_PRESS) {
         const actionId = detail.pressAction?.id;
         console.log('🔔 Notification action pressed:', actionId);
@@ -258,6 +274,7 @@ class NotificationService {
 
       if (type === EventType.PRESS) {
         console.log('🔔 Background notification pressed:', detail.notification?.data);
+        this.handleNotificationPress(detail.notification);
       } else if (type === EventType.ACTION_PRESS) {
         const actionId = detail.pressAction?.id;
         if (actionId === 'mark_read') {
@@ -268,6 +285,64 @@ class NotificationService {
         }
       }
     });
+  }
+
+  private emitNotificationPress(payload: NotificationPressPayload) {
+    this.notificationPressListeners.forEach((listener) => {
+      listener(payload);
+    });
+  }
+
+  private parseNotificationPayload(notification: Notification | null | undefined): NotificationPressPayload | null {
+    if (!notification?.data) {
+      return null;
+    }
+
+    const { chatId, chatName, isGroup, messageId } = notification.data;
+
+    if (!chatId) {
+      return null;
+    }
+
+    return {
+      chatId: String(chatId),
+      chatName: chatName ? String(chatName) : undefined,
+      isGroup: isGroup ? String(isGroup) === 'true' : undefined,
+      messageId: messageId ? String(messageId) : undefined,
+    };
+  }
+
+  private handleNotificationPress(notification: Notification | null | undefined) {
+    const payload = this.parseNotificationPayload(notification);
+
+    if (!payload) {
+      return;
+    }
+
+    this.emitNotificationPress(payload);
+  }
+
+  onNotificationPress(listener: (payload: NotificationPressPayload) => void) {
+    this.notificationPressListeners.add(listener);
+
+    return () => {
+      this.notificationPressListeners.delete(listener);
+    };
+  }
+
+  async getInitialNotification(): Promise<NotificationPressPayload | null> {
+    try {
+      const initial: InitialNotification | null = await notifee.getInitialNotification();
+
+      if (!initial) {
+        return null;
+      }
+
+      return this.parseNotificationPayload(initial.notification);
+    } catch (error) {
+      console.error('❌ Failed to get initial notification:', error);
+      return null;
+    }
   }
 }
 

@@ -2,7 +2,6 @@
 
 import { Alert } from 'react-native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import Geolocation from '@react-native-community/geolocation';
 
 export interface PickedAttachment {
   uri: string;
@@ -196,46 +195,13 @@ export const validateAttachment = (
 };
 
 /**
- * Get current location
+ * Get current location with proper permission handling
  */
 export const getCurrentLocation = async (): Promise<{
   latitude: number;
   longitude: number;
 } | null> => {
-  return new Promise(resolve => {
-    // Uncomment to use real geolocation:
-
-    Geolocation.getCurrentPosition(
-      position => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      error => {
-        console.error('Location error:', error);
-        Alert.alert('Error', 'Failed to get current location');
-        resolve(null);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-    );
-
-    // Mock location for testing
-    Alert.alert('Location Sharing', 'Share your current location?', [
-      {
-        text: 'Share Location',
-        onPress: () => {
-          // Mock San Francisco coordinates
-          resolve({
-            latitude: 37.7749,
-            longitude: -122.4194,
-          });
-        },
-      },
-      {
-        text: 'Cancel',
-        onPress: () => resolve(null),
-      },
-    ]);
-  });
+  // Import the proper function from geolocation utility
+  const { getCurrentLocationWithPermission } = require('./geolocation');
+  return getCurrentLocationWithPermission();
 };

@@ -4,6 +4,7 @@ import React from 'react';
 import { Avatar } from 'react-native-paper';
 import { StyleProp, ViewStyle } from 'react-native';
 import DefaultAvatar from './DefaultAvatar';
+import { ensureAbsoluteUrl } from '../utils/url';
 
 interface UserAvatarProps {
   size: number;
@@ -20,11 +21,13 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   isGroup = false, 
   style 
 }) => {
-  if (avatarUrl) {
+  const normalizedUrl = ensureAbsoluteUrl(avatarUrl);
+
+  if (normalizedUrl) {
     return (
       <Avatar.Image
         size={size}
-        source={{ uri: avatarUrl }}
+        source={{ uri: normalizedUrl }}
         style={style}
       />
     );

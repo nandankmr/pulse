@@ -1,6 +1,6 @@
 // src/utils/imagePicker.ts
 
-import { Alert } from 'react-native';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import {
   launchCamera,
   launchImageLibrary,
@@ -54,6 +54,15 @@ export const pickImage = async (): Promise<ImagePickerResult | null> => {
  */
 const openCamera = async (): Promise<ImagePickerResult | null> => {
   try {
+    const hasPermission = await ensureCameraPermission();
+    if (!hasPermission) {
+      Alert.alert(
+        'Permission Required',
+        'Camera permission is required to take a photo. Please enable it in settings.'
+      );
+      return null;
+    }
+
     const response: ImagePickerResponse = await launchCamera({
       mediaType: 'photo',
       quality: 0.8,
@@ -68,6 +77,27 @@ const openCamera = async (): Promise<ImagePickerResult | null> => {
     console.error('Camera error:', error);
     return null;
   }
+};
+
+const ensureCameraPermission = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') {
+    return true;
+  }
+
+  const permission = PermissionsAndroid.PERMISSIONS.CAMERA;
+  const hasPermission = await PermissionsAndroid.check(permission);
+  if (hasPermission) {
+    return true;
+  }
+
+  const status = await PermissionsAndroid.request(permission, {
+    title: 'Camera Permission',
+    message: 'Agastya needs access to your camera to take photos.',
+    buttonPositive: 'Allow',
+    buttonNegative: 'Deny',
+  });
+
+  return status === PermissionsAndroid.RESULTS.GRANTED;
 };
 
 /**

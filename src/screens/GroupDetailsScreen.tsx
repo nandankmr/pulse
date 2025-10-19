@@ -25,18 +25,18 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { RootStackParamList } from '../navigation/types';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import {
   getGroupMembersAPI,
-  updateGroupDetailsAPI,
   removeGroupMemberAPI,
   updateMemberRoleAPI,
   leaveGroupAPI,
   addGroupMembersAPI,
   GroupMember,
 } from '../api/chat';
+import { useDeleteGroup } from '../hooks/useGroups';
 import { searchUsersAPI, UserSearchResult } from '../api/user';
 import UserAvatar from '../components/UserAvatar';
 
@@ -57,10 +57,7 @@ const GroupDetailsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
-  const [editDialogVisible, setEditDialogVisible] = useState(false);
   const [addMemberDialogVisible, setAddMemberDialogVisible] = useState(false);
-  const [newGroupName, setNewGroupName] = useState(groupName || '');
-  const [newGroupDescription, setNewGroupDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -87,24 +84,8 @@ const GroupDetailsScreen: React.FC = () => {
     }
   };
 
-  const handleUpdateGroup = async () => {
-    if (!newGroupName.trim()) {
-      Alert.alert('Error', 'Group name cannot be empty');
-      return;
-    }
-
-    try {
-      await updateGroupDetailsAPI(groupId, {
-        name: newGroupName.trim(),
-        description: newGroupDescription.trim() || undefined,
-      });
-      setEditDialogVisible(false);
-      Alert.alert('Success', 'Group details updated successfully');
-      // Refresh members to get updated group info
-      fetchGroupMembers();
-    } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to update group');
-    }
+  const handleOpenEditGroup = () => {
+    (navigation as any).navigate('EditGroup', { groupId });
   };
 
   const handlePromoteDemote = async (memberId: string, currentRole: string) => {
@@ -383,7 +364,7 @@ const GroupDetailsScreen: React.FC = () => {
             <IconButton
               icon="pencil"
               size={24}
-              onPress={() => setEditDialogVisible(true)}
+              onPress={handleOpenEditGroup}
             />
           )}
         </View>
@@ -449,38 +430,8 @@ const GroupDetailsScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Edit Group Dialog */}
+      {/* Add Members Dialog */}
       <Portal>
-        <Dialog
-          visible={editDialogVisible}
-          onDismiss={() => setEditDialogVisible(false)}
-        >
-          <Dialog.Title>Edit Group Details</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              label="Group Name"
-              value={newGroupName}
-              onChangeText={setNewGroupName}
-              mode="outlined"
-              style={styles.input}
-            />
-            <TextInput
-              label="Description (Optional)"
-              value={newGroupDescription}
-              onChangeText={setNewGroupDescription}
-              mode="outlined"
-              multiline
-              numberOfLines={3}
-              style={styles.input}
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setEditDialogVisible(false)}>Cancel</Button>
-            <Button onPress={handleUpdateGroup}>Save</Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Add Members Dialog */}
         <Dialog
           visible={addMemberDialogVisible}
           onDismiss={() => {

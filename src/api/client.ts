@@ -46,16 +46,16 @@ apiClient.interceptors.request.use(
     }
 
     // 🔵 TEMPORARY: Log all network requests
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📤 API REQUEST:', config.method?.toUpperCase(), config.url, config.baseURL);
-    console.log('Headers:', JSON.stringify(config.headers, null, 2));
-    if (config.data) {
-      console.log('Body:', JSON.stringify(config.data, null, 2));
-    }
-    if (config.params) {
-      console.log('Params:', JSON.stringify(config.params, null, 2));
-    }
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    // console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    // console.log('📤 API REQUEST:', config.method?.toUpperCase(), config.url, config.baseURL);
+    // console.log('Headers:', JSON.stringify(config.headers, null, 2));
+    // if (config.data) {
+    //   console.log('Body:', JSON.stringify(config.data, null, 2));
+    // }
+    // if (config.params) {
+    //   console.log('Params:', JSON.stringify(config.params, null, 2));
+    // }
+    // console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     return config;
   },
@@ -69,9 +69,9 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     // 🔵 TEMPORARY: Log all network responses
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📥 API RESPONSE:', response.status, response.config.method?.toUpperCase(), response.config.url);
-    console.log('Data:', JSON.stringify(response.data, null, 2));
+    // console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    // console.log('📥 API RESPONSE:', response.status, response.config.method?.toUpperCase(), response.config.url);
+    // console.log('Data:', JSON.stringify(response.data, null, 2));
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return response;
   },
