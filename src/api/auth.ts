@@ -7,10 +7,11 @@ import { getDeviceInfo } from '../utils/deviceInfo';
 // Request types
 export interface LoginRequest {
   email: string;
-  password: string;
+  password?: string;
   deviceId?: string;
   deviceName?: string;
   platform?: string;
+  firebaseIdToken?: string;
 }
 
 export interface RegisterRequest {
@@ -20,6 +21,7 @@ export interface RegisterRequest {
   deviceId?: string;
   deviceName?: string;
   platform?: string;
+  firebaseIdToken?: string;
 }
 
 export interface RefreshTokenRequest {

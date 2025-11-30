@@ -26,6 +26,7 @@ import { useMessageOperations } from '../hooks/useMessageOperations';
 import { useMessages, useSendMessage } from '../hooks/useMessages';
 import { socketManager } from '../utils/socketManager';
 import { notificationService } from '../services/notificationService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
   EnrichedSocketMessage,
   NewMessagePayload,
@@ -43,12 +44,21 @@ interface RouteParams {
 }
 
 const ensureMessageDefaults = (message: Message, currentUserId: string): Message => {
-  const deliveredTo = message.deliveredTo ?? [];
-  const readBy = message.readBy ?? [];
-  const participantIds = message.participantIds ?? [];
-  const attachments = message.attachments ?? [];
-  const content = message.content ?? null;
-  const senderAvatar = message.senderAvatar ?? null;
+  const deliveredTo = (message.deliveredTo ?? (message as any).delivered_to ?? [])
+    .filter((id: unknown) => id != null)
+    .map((id: unknown) => String(id));
+  const readBy = (message.readBy ?? (message as any).read_by ?? [])
+    .filter((id: unknown) => id != null)
+    .map((id: unknown) => String(id));
+  const rawParticipantIds = message.participantIds ?? (message as any).participantIds ?? (message as any).participants ?? [];
+  const participantIds = (Array.isArray(rawParticipantIds) ? rawParticipantIds : [])
+    .filter((id: unknown) => id != null)
+    .map((id: unknown) => String(id));
+  const attachments = message.attachments ?? (message as any).attachments ?? [];
+  const content = message.content ?? (message as any).message ?? null;
+  const senderData = (message as any).sender ?? null;
+  const rawSenderAvatar = message.senderAvatar ?? (senderData ? senderData.avatarUrl ?? senderData.avatar ?? null : null);
+  const senderAvatar = rawSenderAvatar ?? null;
   const replyTo = message.replyTo ?? null;
   const editedAt = message.editedAt ?? null;
   const deletedAt = message.deletedAt ?? null;
@@ -60,11 +70,16 @@ const ensureMessageDefaults = (message: Message, currentUserId: string): Message
     }
     return message.metadata;
   })();
-  const actorId = message.actorId ?? null;
-  const targetUserId = message.targetUserId ?? null;
+  const actorId = message.actorId == null ? null : String(message.actorId);
+  const targetUserId = message.targetUserId == null ? null : String(message.targetUserId);
+  const rawSenderId = (message as any).senderId ?? (senderData ? senderData.id ?? senderData.userId ?? null : null);
+  const senderId = rawSenderId == null ? '' : String(rawSenderId);
+  const senderName = message.senderName ?? (senderData ? senderData.name ?? senderData.fullName ?? null : null);
 
   return {
     ...message,
+    senderId,
+    senderName: senderName ?? message.senderName ?? '',
     content,
     senderAvatar,
     attachments,
@@ -144,11 +159,41 @@ const ChatScreen: React.FC = () => {
   const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUserId, setTypingUserId] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
   const [typingUserName, setTypingUserName] = useState<string>('');
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markedMessageIdsRef = useRef<Set<string>>(new Set());
-  const typingUserIdRef = useRef<string | null>(null);
+  const typingUserIdRef = useRef<string | null>(null);  
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const bottomInset = insets.bottom;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const hideEvent = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const isIOS = Platform.OS === 'ios';
+  const keyboardVisible = keyboardHeight > 0;
+  const baseComposerPadding = isIOS ? 12 : 8;
+  
+  // On Android with adjustResize, we don't need extra padding since the view resizes
+  // On iOS, KeyboardAvoidingView handles it
+  const composerPaddingBottom = Math.max(bottomInset, baseComposerPadding);
+  
+  const listPaddingBottom = composerPaddingBottom + (keyboardVisible ? 8 : 24);
 
   // Get current user ID from Redux store
   const currentUser = useSelector((state: RootState) => state.auth.user);
@@ -873,6 +918,8 @@ const ChatScreen: React.FC = () => {
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwnMessage = item.senderId === currentUserId;
     const isSystemMessage = Boolean(item.systemType);
+    console.log(currentUserId);
+    
 
     // System messages (group events)
     if (isSystemMessage) {
@@ -1109,11 +1156,13 @@ const ChatScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        enabled={Platform.OS === 'ios'}
+      >
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <Text variant="bodyLarge" style={{ color: colors.text }}>
@@ -1135,7 +1184,10 @@ const ChatScreen: React.FC = () => {
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          contentContainerStyle={styles.messagesList}
+          contentContainerStyle={[
+            styles.messagesList,
+            { paddingBottom: listPaddingBottom },
+          ]}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -1151,7 +1203,16 @@ const ChatScreen: React.FC = () => {
         </View>
       )}
 
-      <View style={[styles.inputContainer, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.inputContainer,
+          {
+            backgroundColor: colors.background,
+            paddingBottom: composerPaddingBottom,
+            marginBottom: Platform.OS === 'android' && keyboardVisible ? keyboardHeight * 0.15 : 0,
+          },
+        ]}
+      >
         <IconButton
           icon="paperclip"
           size={24}
@@ -1164,6 +1225,8 @@ const ChatScreen: React.FC = () => {
           value={editingMessage ? editText : inputText}
           onChangeText={editingMessage ? setEditText : handleInputChange}
           style={styles.input}
+          contentStyle={styles.inputContent}
+          textAlignVertical="center"
           multiline
           maxLength={1000}
           right={
@@ -1186,41 +1249,53 @@ const ChatScreen: React.FC = () => {
 
       {/* Edit Message Banner */}
       {editingMessage && (
-        <View style={[styles.editBanner, { backgroundColor: colors.primary }]}>
+        <View
+          style={[
+            styles.editBanner,
+            {
+              backgroundColor: colors.primary,
+              bottom: composerPaddingBottom + 54,
+            },
+          ]}
+        >
           <Text variant="bodySmall" style={styles.editBannerText}>
             Editing message
           </Text>
         </View>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Portal>
-        <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
-          <Dialog.Title>Delete Message</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">
-              Are you sure you want to delete this message?
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowDeleteDialog(false)}>Cancel</Button>
-            <Button onPress={() => confirmDelete(false)}>Delete for Me</Button>
-            {messageToDelete && canDeleteForEveryone(messageToDelete) && (
-              <Button 
-                onPress={() => confirmDelete(true)}
-                textColor="#F44336"
-              >
-                Delete for Everyone
-              </Button>
-            )}
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </KeyboardAvoidingView>
+        {/* Delete Confirmation Dialog */}
+        <Portal>
+          <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)}>
+            <Dialog.Title>Delete Message</Dialog.Title>
+            <Dialog.Content>
+              <Text variant="bodyMedium">
+                Are you sure you want to delete this message?
+              </Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setShowDeleteDialog(false)}>Cancel</Button>
+              <Button onPress={() => confirmDelete(false)}>Delete for Me</Button>
+              {messageToDelete && canDeleteForEveryone(messageToDelete) && (
+                <Button 
+                  onPress={() => confirmDelete(true)}
+                  textColor="#F44336"
+                >
+                  Delete for Everyone
+                </Button>
+              )}
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
@@ -1250,6 +1325,8 @@ const styles = StyleSheet.create({
   ownMessage: {
     alignSelf: 'flex-end',
     flexDirection: 'row-reverse',
+    alignItems: 'flex-end',
+    marginLeft: 'auto',
   },
   otherMessage: {
     alignSelf: 'flex-start',
@@ -1267,6 +1344,21 @@ const styles = StyleSheet.create({
   },
   otherBubble: {
     backgroundColor: '#E0E0E0',
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontWeight: 'bold',
+  },
+  headerSubtext: {
+    opacity: 0.7,
+    fontSize: 12,
+  },
+  headerButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
   senderName: {
     fontWeight: 'bold',
@@ -1334,6 +1426,13 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     maxHeight: 100,
+    marginBottom: 0,
+  },
+  inputContent: {
+    lineHeight: 30,
+    paddingTop: 14,
+    paddingBottom: 14,
+    marginBottom: 0,
   },
   editBanner: {
     position: 'absolute',

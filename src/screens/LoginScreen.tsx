@@ -17,9 +17,9 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const validateEmail = (email: string) => {
+  const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return emailRegex.test(value);
   };
 
   const handleLogin = async () => {
@@ -105,12 +105,14 @@ const LoginScreen: React.FC = () => {
           {loginMutation.isError ? (
             <HelperText type="error" visible={loginMutation.isError} style={styles.errorText}>
               {(() => {
-                console.log('🔴 Login error object:', loginMutation.error);
-                console.log('🔴 Is ApiError?', isApiError(loginMutation.error));
                 if (isApiError(loginMutation.error)) {
-                  console.log('🔴 Error message:', loginMutation.error.message);
                   return loginMutation.error.message;
                 }
+
+                if (loginMutation.error instanceof Error && loginMutation.error.message) {
+                  return loginMutation.error.message;
+                }
+
                 return 'Login failed. Please try again.';
               })()}
             </HelperText>

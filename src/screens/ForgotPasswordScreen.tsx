@@ -4,24 +4,27 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
+import { layout } from '../theme';
 import { useNavigation } from '@react-navigation/native';
 import { useForgotPassword } from '../hooks/useAuth';
+import config from '../config';
 
 const ForgotPasswordScreen: React.FC = () => {
   const { colors } = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const forgotPasswordMutation = useForgotPassword();
+  const isFirebaseAuthEnabled = config.USE_FIREBASE_AUTH;
   
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
 
-  const validateEmail = (email: string): boolean => {
+  const validateEmail = (value: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email) {
+    if (!value) {
       setEmailError('Email is required');
       return false;
     }
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(value)) {
       setEmailError('Please enter a valid email');
       return false;
     }
@@ -35,6 +38,22 @@ const ForgotPasswordScreen: React.FC = () => {
     try {
       await forgotPasswordMutation.mutateAsync({ email });
       
+      if (isFirebaseAuthEnabled) {
+        Alert.alert(
+          'Email sent',
+          "We've sent you a password reset email. Please open that link to set a new password.",
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Login');
+              },
+            },
+          ]
+        );
+        return;
+      }
+
       Alert.alert(
         'Success',
         'If the email exists, a password reset code has been sent.',
@@ -42,8 +61,7 @@ const ForgotPasswordScreen: React.FC = () => {
           {
             text: 'OK',
             onPress: () => {
-              // Navigate to reset password screen
-              navigation.navigate('ResetPassword' as never, { email } as never);
+              navigation.navigate('ResetPassword', { email });
             },
           },
         ]
@@ -67,7 +85,9 @@ const ForgotPasswordScreen: React.FC = () => {
           Forgot Password?
         </Text>
         <Text variant="bodyLarge" style={[styles.subtitle, { color: colors.text }]}>
-          Enter your email address and we'll send you a code to reset your password.
+          {isFirebaseAuthEnabled
+            ? "Enter your email address and we'll send you a password reset link."
+            : "Enter your email address and we'll send you a code to reset your password."}
         </Text>
       </View>
 
@@ -100,7 +120,7 @@ const ForgotPasswordScreen: React.FC = () => {
           disabled={forgotPasswordMutation.isPending || !email}
           style={styles.button}
         >
-          Send Reset Code
+          {isFirebaseAuthEnabled ? 'Send Reset Link' : 'Send Reset Code'}
         </Button>
 
         <Button
@@ -123,11 +143,14 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: layout.screen.paddingHorizontal,
+    paddingVertical: layout.screen.paddingVertical,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: layout.screen.paddingVertical,
     alignItems: 'center',
+    paddingHorizontal: layout.header.paddingHorizontal,
+    paddingVertical: layout.header.paddingVertical,
   },
   title: {
     marginBottom: 12,

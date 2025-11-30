@@ -4,18 +4,19 @@ import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Button, Text, Divider } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
+import { layout } from '../theme';
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { RootState } from '../store';
 import { useLogout } from '../hooks/useAuth';
 import { clearAllData } from '../utils/storage';
 import UserAvatar from '../components/UserAvatar';
-import AgastyaChatIcon from '../../assets/agastya-chat-icon.svg';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ProfileScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
-  const { user, refreshToken, deviceId } = useSelector((state: RootState) => state.auth);
+  const { user, refreshToken, deviceId, provider } = useSelector((state: RootState) => state.auth);
   const logoutMutation = useLogout();
 
   const handleLogout = async () => {
@@ -32,10 +33,11 @@ const ProfileScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (refreshToken && deviceId) {
+              if (provider === 'firebase') {
+                await logoutMutation.mutateAsync(undefined);
+              } else if (refreshToken && deviceId) {
                 await logoutMutation.mutateAsync({ refreshToken, deviceId });
               } else {
-                // If no tokens, just clear local data
                 await clearAllData();
               }
             } catch (error) {
@@ -58,10 +60,11 @@ const ProfileScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+      >
       {/* <View style={styles.branding}>
         <AgastyaChatIcon width={72} height={72} />
         <Text variant="titleLarge" style={[styles.brandingText, { color: colors.text }]}>Agastya</Text>
@@ -146,19 +149,24 @@ const ProfileScreen: React.FC = () => {
           Logout
         </Button>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
   content: {
-    padding: 24,
+    paddingHorizontal: layout.screen.paddingHorizontal,
+    paddingVertical: layout.screen.paddingVertical,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: layout.screen.paddingVertical,
   },
   title: {
     fontWeight: 'bold',

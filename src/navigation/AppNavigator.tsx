@@ -128,12 +128,12 @@ export default function AppNavigator() {
             <Stack.Screen 
               name="UserDetails" 
               component={UserDetailsScreen}
-              options={{ headerShown: false }}
+              options={{ headerShown: true }}
             />
             <Stack.Screen 
               name="GroupDetails" 
               component={GroupDetailsScreen}
-              options={{ headerShown: false }}
+              options={{ headerShown: true }}
             />
           </>
         )}

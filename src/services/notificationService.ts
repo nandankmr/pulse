@@ -95,6 +95,15 @@ class NotificationService {
       // Don't show notification if app is in foreground and chat is open
       // This will be handled by the caller
       
+      const iosOptions: Notification['ios'] = {
+        sound: 'default',
+        categoryId: 'message',
+      };
+
+      if (params.senderAvatar) {
+        iosOptions.attachments = [{ url: params.senderAvatar }];
+      }
+
       await notifee.displayNotification({
         id: messageId,
         title: senderName,
@@ -129,13 +138,7 @@ class NotificationService {
             },
           ],
         },
-        ios: {
-          sound: 'default',
-          categoryId: 'message',
-          attachments: params.senderAvatar
-            ? [{ url: params.senderAvatar }]
-            : undefined,
-        },
+        ios: iosOptions,
         data: {
           messageId,
           chatId,

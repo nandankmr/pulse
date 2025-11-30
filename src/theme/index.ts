@@ -54,3 +54,14 @@ export const typography = {
     bold: '700' as const,
   },
 };
+
+export const layout = {
+  header: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  screen: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
+  },
+};

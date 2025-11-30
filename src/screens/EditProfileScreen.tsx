@@ -6,6 +6,7 @@ import { TextInput, Button, Text, Divider } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { useTheme } from '../theme/ThemeContext';
+import { layout } from '../theme';
 import { RootState } from '../store';
 import { updateUser } from '../store/authSlice';
 import { updateProfileAPI } from '../api/user';
@@ -226,10 +227,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: layout.screen.paddingHorizontal,
+    paddingVertical: layout.screen.paddingVertical,
   },
   header: {
-    marginBottom: 16,
+    marginBottom: layout.screen.paddingVertical,
+    paddingHorizontal: layout.header.paddingHorizontal,
+    paddingVertical: layout.header.paddingVertical,
   },
   title: {
     fontWeight: 'bold',

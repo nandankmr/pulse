@@ -1,12 +1,13 @@
 // src/screens/RegisterScreen.tsx
 
 import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { TextInput, Button, Text, HelperText } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import { useRegister } from '../hooks/useAuth';
 import { isApiError } from '../types/api';
+import config from '../config';
 
 const RegisterScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -21,14 +22,14 @@ const RegisterScreen: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validateEmail = (email: string) => {
+  const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return emailRegex.test(value);
   };
 
-  const validatePassword = (password: string) => {
+  const validatePassword = (value: string) => {
     // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
-    return password.length >= 8;
+    return value.length >= 8;
   };
 
   const validateForm = () => {
@@ -67,8 +68,18 @@ const RegisterScreen: React.FC = () => {
 
     try {
       await registerMutation.mutateAsync({ name, email, password });
-      // After successful registration, navigate to email verification
-      navigation.navigate('EmailVerification' as never, { email } as never);
+
+      if (config.USE_FIREBASE_AUTH) {
+        Alert.alert(
+          'Verify your email',
+          'We\'ve sent a verification link to your email. Open the link to verify your account, then sign in here.'
+        );
+        navigation.navigate('Login' as never);
+        return;
+      }
+
+      // Legacy auth: navigate to OTP verification flow
+      (navigation as any).navigate('EmailVerification', { email });
     } catch (err) {
       const errorMessage = isApiError(err) 
         ? err.message 

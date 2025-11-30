@@ -1,12 +1,15 @@
 // src/utils/storage.ts
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { AuthResponse } from '../api/auth';
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN: '@pulse/access_token',
   REFRESH_TOKEN: '@pulse/refresh_token',
   DEVICE_ID: '@pulse/device_id',
   USER_DATA: '@pulse/user_data',
+  AUTH_PROVIDER: '@pulse/auth_provider',
+  FIREBASE_SESSION: '@pulse/firebase_session',
 };
 
 /**
@@ -178,6 +181,8 @@ export const clearAllData = async (): Promise<void> => {
       STORAGE_KEYS.REFRESH_TOKEN,
       STORAGE_KEYS.DEVICE_ID,
       STORAGE_KEYS.USER_DATA,
+      STORAGE_KEYS.AUTH_PROVIDER,
+      STORAGE_KEYS.FIREBASE_SESSION,
     ]);
   } catch (error) {
     console.error('Error clearing all data:', error);
@@ -194,9 +199,63 @@ export const removeAuthToken = async (): Promise<void> => {
       STORAGE_KEYS.ACCESS_TOKEN,
       STORAGE_KEYS.REFRESH_TOKEN,
       STORAGE_KEYS.DEVICE_ID,
+      STORAGE_KEYS.AUTH_PROVIDER,
+      STORAGE_KEYS.FIREBASE_SESSION,
     ]);
   } catch (error) {
     console.error('Error removing auth tokens:', error);
     throw error;
+  }
+};
+
+export const saveAuthProvider = async (
+  provider: 'legacy' | 'firebase'
+): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.AUTH_PROVIDER, provider);
+  } catch (error) {
+    console.error('Error saving auth provider:', error);
+    throw error;
+  }
+};
+
+export const getAuthProvider = async (): Promise<'legacy' | 'firebase' | null> => {
+  try {
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_PROVIDER);
+    if (value === 'legacy' || value === 'firebase') {
+      return value;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting auth provider:', error);
+    return null;
+  }
+};
+
+export type FirebaseSession = AuthResponse;
+
+export const saveFirebaseSession = async (session: FirebaseSession): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.FIREBASE_SESSION, JSON.stringify(session));
+  } catch (error) {
+    console.error('Error saving firebase session:', error);
+  }
+};
+
+export const getStoredFirebaseSession = async (): Promise<FirebaseSession | null> => {
+  try {
+    const data = await AsyncStorage.getItem(STORAGE_KEYS.FIREBASE_SESSION);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error('Error getting firebase session:', error);
+    return null;
+  }
+};
+
+export const removeFirebaseSession = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.FIREBASE_SESSION);
+  } catch (error) {
+    console.error('Error removing firebase session:', error);
   }
 };

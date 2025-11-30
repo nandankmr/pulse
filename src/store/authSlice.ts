@@ -19,6 +19,7 @@ interface AuthState {
   deviceId: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  provider: 'legacy' | 'firebase';
 }
 
 const initialState: AuthState = {
@@ -28,6 +29,7 @@ const initialState: AuthState = {
   deviceId: null,
   isAuthenticated: false,
   isLoading: false,
+  provider: 'legacy',
 };
 
 export const authSlice = createSlice({
@@ -41,6 +43,7 @@ export const authSlice = createSlice({
         accessToken: string;
         refreshToken: string;
         deviceId: string;
+        provider?: 'legacy' | 'firebase';
       }>
     ) => {
       state.user = action.payload.user;
@@ -49,6 +52,7 @@ export const authSlice = createSlice({
       state.deviceId = action.payload.deviceId;
       state.isAuthenticated = true;
       state.isLoading = false;
+      state.provider = action.payload.provider ?? 'legacy';
     },
     setTokens: (
       state,
@@ -80,10 +84,14 @@ export const authSlice = createSlice({
       state.deviceId = null;
       state.isAuthenticated = false;
       state.isLoading = false;
+      state.provider = 'legacy';
+    },
+    setProvider: (state, action: PayloadAction<'legacy' | 'firebase'>) => {
+      state.provider = action.payload;
     },
   },
 });
 
-export const { setAuth, setTokens, setUser, updateUser, setLoading, logout } =
+export const { setAuth, setTokens, setUser, updateUser, setLoading, logout, setProvider } =
   authSlice.actions;
 export default authSlice.reducer;

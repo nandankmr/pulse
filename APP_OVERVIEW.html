@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>APP_OVERVIEW</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#agastya---real-time-messaging-application"
+id="toc-agastya---real-time-messaging-application">Agastya - Real-Time
+Messaging Application</a>
+<ul>
+<li><a href="#what-is-agastya" id="toc-what-is-agastya">What is
+Agastya?</a></li>
+<li><a href="#key-features" id="toc-key-features">Key Features</a></li>
+<li><a href="#how-it-works" id="toc-how-it-works">How It Works</a></li>
+<li><a href="#technical-stack" id="toc-technical-stack">Technical
+Stack</a></li>
+<li><a href="#architecture" id="toc-architecture">Architecture</a></li>
+<li><a href="#performance-scalability"
+id="toc-performance-scalability">Performance &amp; Scalability</a></li>
+<li><a href="#security-features" id="toc-security-features">Security
+Features</a></li>
+<li><a href="#planned-features" id="toc-planned-features">Planned
+Features</a></li>
+<li><a href="#summary" id="toc-summary">Summary</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="agastya---real-time-messaging-application">Agastya - Real-Time
+Messaging Application</h1>
+<h2 id="what-is-agastya">What is Agastya?</h2>
+<p>Agastya is a modern, feature-rich messaging application similar to
+WhatsApp or Telegram. It allows users to send instant messages, share
+photos and videos, create group chats, and stay connected with friends
+and family in real-time. The app works on both Android and iOS
+devices.</p>
+<hr />
+<h2 id="key-features">Key Features</h2>
+<h3 id="user-authentication-security">User Authentication &amp;
+Security</h3>
+<ul>
+<li><strong>Sign Up &amp; Login</strong>: Create an account with email
+and password</li>
+<li><strong>Email Verification</strong>: Verify your email address to
+activate your account</li>
+<li><strong>Password Management</strong>: Reset forgotten passwords
+securely</li>
+<li><strong>Firebase Authentication</strong>: Modern authentication
+system with Google’s Firebase</li>
+<li><strong>Multi-Device Support</strong>: Use Agastya on multiple
+devices simultaneously</li>
+<li><strong>Secure Sessions</strong>: Your conversations are protected
+with industry-standard security</li>
+</ul>
+<h3 id="messaging-features">Messaging Features</h3>
+<ul>
+<li><strong>Real-Time Messaging</strong>: Messages are delivered
+instantly using WebSocket technology</li>
+<li><strong>One-on-One Chats</strong>: Private conversations with
+individual contacts</li>
+<li><strong>Group Chats</strong>: Create groups and chat with multiple
+people at once</li>
+<li><strong>Message Status</strong>: See when messages are delivered and
+read (✓✓)</li>
+<li><strong>Typing Indicators</strong>: Know when someone is typing a
+response</li>
+<li><strong>Message Editing</strong>: Edit messages after sending them
+(within 15 minutes, with edit history)</li>
+<li><strong>Message Deletion</strong>: Delete messages for yourself or
+everyone (within 1 hour for everyone)</li>
+<li><strong>Chat Search</strong>: Search and filter your chat list</li>
+</ul>
+<h3 id="rich-media-sharing">Rich Media Sharing</h3>
+<ul>
+<li><strong>Photo Sharing</strong>: Send images from your camera or
+gallery (up to 10MB)</li>
+<li><strong>Video Sharing</strong>: Share video clips up to 60 seconds
+(up to 50MB)</li>
+<li><strong>Location Sharing</strong>: Share your current location on a
+map</li>
+</ul>
+<h3 id="group-management">Group Management</h3>
+<ul>
+<li><strong>Create Groups</strong>: Start group conversations with
+multiple people</li>
+<li><strong>Group Settings</strong>: Customize group name, description,
+and avatar</li>
+<li><strong>Member Management</strong>: Add or remove group members</li>
+<li><strong>Admin Controls</strong>: Assign admin roles to trusted
+members</li>
+<li><strong>Group Invitations</strong>: Invite people via secure
+invitation links</li>
+<li><strong>Member Roles</strong>: Different permissions for admins and
+regular members</li>
+<li><strong>Group Details</strong>: View all group members and their
+roles</li>
+</ul>
+<h3 id="profile-personalization">Profile &amp; Personalization</h3>
+<ul>
+<li><strong>User Profiles</strong>: View detailed profiles of your
+contacts</li>
+<li><strong>Profile Editing</strong>: Update your name, email, and
+profile picture</li>
+<li><strong>Avatar Upload</strong>: Set a custom profile picture</li>
+<li><strong>Dark Mode</strong>: Switch between light and dark themes for
+comfortable viewing</li>
+<li><strong>User Search</strong>: Find and connect with other users</li>
+</ul>
+<h3 id="notifications">Notifications</h3>
+<ul>
+<li><strong>Push Notifications</strong>: Get notified of new messages
+even when the app is closed</li>
+<li><strong>Smart Notifications</strong>: See message previews in
+notifications</li>
+<li><strong>Notification Management</strong>: Control which
+notifications you receive</li>
+<li><strong>Background Updates</strong>: Stay updated even when not
+actively using the app</li>
+</ul>
+<h3 id="user-experience">User Experience</h3>
+<ul>
+<li><strong>Modern UI</strong>: Beautiful, intuitive interface following
+Material Design principles</li>
+<li><strong>Smooth Navigation</strong>: Easy-to-use navigation between
+chats and features</li>
+<li><strong>Offline Support</strong>: View previous messages even
+without internet</li>
+<li><strong>Fast Performance</strong>: Optimized for quick loading and
+smooth scrolling</li>
+<li><strong>Responsive Design</strong>: Works perfectly on phones and
+tablets of all sizes</li>
+<li><strong>Multi-Language Support</strong>: Interface available in
+multiple languages (i18n ready)</li>
+</ul>
+<hr />
+<h2 id="how-it-works">How It Works</h2>
+<h3 id="for-users">For Users</h3>
+<ol type="1">
+<li><strong>Getting Started</strong>
+<ul>
+<li>Download the Agastya app on your Android or iOS device</li>
+<li>Create an account with your email and password</li>
+<li>Verify your email address</li>
+<li>Set up your profile with a name and photo</li>
+</ul></li>
+<li><strong>Starting Conversations</strong>
+<ul>
+<li>Search for friends by their email or username</li>
+<li>Start a one-on-one chat or create a group</li>
+<li>Send text messages, photos, videos, or your location</li>
+<li>See when messages are delivered and read</li>
+</ul></li>
+<li><strong>Managing Groups</strong>
+<ul>
+<li>Create groups for family, friends, or work teams</li>
+<li>Add members and assign admin roles</li>
+<li>Customize group settings and appearance</li>
+<li>Control who can send messages and add members</li>
+</ul></li>
+<li><strong>Staying Connected</strong>
+<ul>
+<li>Receive instant notifications for new messages</li>
+<li>See when friends are typing</li>
+<li>Share your location to meet up</li>
+<li>Access your chats from multiple devices</li>
+</ul></li>
+</ol>
+<h3 id="technical-architecture">Technical Architecture</h3>
+<p>Agastya is built with a <strong>client-server
+architecture</strong>:</p>
+<ul>
+<li><strong>Mobile App (Frontend)</strong>: The app you use on your
+phone</li>
+<li><strong>API Server (Backend)</strong>: Handles all data processing
+and storage</li>
+<li><strong>Database</strong>: Stores all messages, users, and groups
+securely</li>
+<li><strong>Real-Time Server</strong>: Enables instant message delivery
+using WebSockets</li>
+<li><strong>Push Notification Service</strong>: Sends notifications to
+your device</li>
+<li><strong>Cloud Storage</strong>: Stores photos, videos, and
+files</li>
+</ul>
+<hr />
+<h2 id="technical-stack">Technical Stack</h2>
+<h3 id="mobile-app">Mobile App</h3>
+<ul>
+<li><strong>React Native</strong> - Cross-platform framework for iOS and
+Android</li>
+<li><strong>TypeScript</strong> - Type-safe programming</li>
+<li><strong>Redux &amp; React Query</strong> - State and data
+management</li>
+<li><strong>Socket.io</strong> - Real-time messaging</li>
+<li><strong>Firebase</strong> - Authentication and push
+notifications</li>
+<li><strong>React Native Paper</strong> - Material Design UI
+components</li>
+</ul>
+<h3 id="backend">Backend</h3>
+<ul>
+<li><strong>Node.js &amp; Express</strong> - Server framework</li>
+<li><strong>PostgreSQL</strong> - Production database</li>
+<li><strong>Prisma ORM</strong> - Database management</li>
+<li><strong>Socket.io &amp; Redis</strong> - Real-time messaging and
+caching</li>
+<li><strong>JWT &amp; bcrypt</strong> - Authentication and security</li>
+<li><strong>Winston</strong> - Logging and monitoring</li>
+</ul>
+<h3 id="infrastructure">Infrastructure</h3>
+<ul>
+<li><strong>Git &amp; GitHub</strong> - Version control</li>
+<li><strong>Redis</strong> - Caching and performance optimization</li>
+<li><strong>Firebase Cloud Messaging</strong> - Push notifications</li>
+<li><strong>Swagger</strong> - API documentation</li>
+</ul>
+<hr />
+<h2 id="architecture">Architecture</h2>
+<p>Agastya follows a modular architecture with clear separation
+between:</p>
+<ul>
+<li><strong>Mobile App</strong>: React Native application for iOS and
+Android with screens, components, and business logic</li>
+<li><strong>Backend API</strong>: Node.js server with modules for
+authentication, messaging, groups, and file handling</li>
+<li><strong>Database</strong>: PostgreSQL database with Prisma ORM for
+data management</li>
+<li><strong>Real-Time Layer</strong>: Socket.io with Redis for instant
+message delivery</li>
+<li><strong>Cloud Services</strong>: Firebase for authentication and
+push notifications</li>
+</ul>
+<hr />
+<h2 id="performance-scalability">Performance &amp; Scalability</h2>
+<ul>
+<li>Fast message delivery with WebSocket connections</li>
+<li>Efficient caching with Redis for improved response times</li>
+<li>Optimized media uploads and loading</li>
+<li>Background synchronization for offline support</li>
+<li>Scalable architecture supporting multiple server instances</li>
+<li>Database optimization for quick data retrieval</li>
+</ul>
+<hr />
+<h2 id="security-features">Security Features</h2>
+<ul>
+<li>Encrypted password storage</li>
+<li>Secure token-based authentication</li>
+<li>Email verification for account activation</li>
+<li>Multi-device session management</li>
+<li>Input validation and data sanitization</li>
+<li>API access controls and security headers</li>
+<li>Protection against abuse and spam</li>
+</ul>
+<hr />
+<h2 id="planned-features">Planned Features</h2>
+<p>The following features are planned for future releases:</p>
+<ul>
+<li><strong>Voice Messages</strong>: Record and send audio clips</li>
+<li><strong>Video Calls</strong>: One-on-one and group video
+calling</li>
+<li><strong>Message Reactions</strong>: React to messages with
+emojis</li>
+<li><strong>Stickers &amp; GIFs</strong>: Express yourself with fun
+media</li>
+<li><strong>Message Threads</strong>: Reply to specific messages in
+context</li>
+<li><strong>Message Search</strong>: Search within conversation
+history</li>
+<li><strong>End-to-End Encryption</strong>: Enhanced privacy for
+sensitive conversations</li>
+<li><strong>Stories</strong>: Share temporary updates with contacts</li>
+<li><strong>Channels</strong>: Broadcast messages to large
+audiences</li>
+<li><strong>Bots &amp; Integrations</strong>: Connect with external
+services</li>
+<li><strong>Cloud Backup</strong>: Backup and restore chat history</li>
+<li><strong>Read Receipts Control</strong>: Choose who can see your read
+status</li>
+</ul>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>Agastya is a professional-grade messaging application built with
+modern, industry-standard technologies. It provides a seamless,
+real-time communication experience with a focus on performance,
+security, and user experience. The app is designed to scale from
+hundreds to millions of users while maintaining fast, reliable message
+delivery.</p>
+<p>Whether you’re chatting with friends, coordinating with family, or
+collaborating with teams, Agastya provides all the features you need in
+a beautiful, easy-to-use package.</p>
+</body>
+</html>

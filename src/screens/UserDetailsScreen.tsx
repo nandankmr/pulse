@@ -1,20 +1,13 @@
 // src/screens/UserDetailsScreen.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   Alert,
 } from 'react-native';
-import {
-  Text,
-  Avatar,
-  Divider,
-  Button,
-  ActivityIndicator,
-  IconButton,
-} from 'react-native-paper';
+import { Text, Divider, Button, ActivityIndicator } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -51,6 +44,13 @@ const UserDetailsScreen: React.FC = () => {
   const [user, setUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: user?.name ?? 'User Details',
+      headerBackTitle: 'Back',
+    });
+  }, [navigation, user?.name]);
 
   useEffect(() => {
     fetchUserDetails();
@@ -151,18 +151,6 @@ const UserDetailsScreen: React.FC = () => {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
     >
-      {/* Header with back button */}
-      <View style={styles.header}>
-        <IconButton
-          icon="arrow-left"
-          size={24}
-          onPress={() => navigation.goBack()}
-        />
-        <Text variant="titleLarge" style={{ color: colors.text, flex: 1 }}>
-          User Details
-        </Text>
-      </View>
-
       {/* Avatar and Name */}
       <View style={styles.profileSection}>
         <UserAvatar
@@ -214,7 +202,7 @@ const UserDetailsScreen: React.FC = () => {
           >
             Send Message
           </Button>
-
+{/* 
           <Button
             mode="outlined"
             icon="block-helper"
@@ -233,7 +221,7 @@ const UserDetailsScreen: React.FC = () => {
             textColor={colors.error}
           >
             Report User
-          </Button>
+          </Button> */}
         </View>
       )}
 
@@ -265,13 +253,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
-    paddingBottom: 32,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    // paddingBottom: 32,
   },
   profileSection: {
     alignItems: 'center',

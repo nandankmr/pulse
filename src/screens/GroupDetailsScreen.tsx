@@ -1,6 +1,6 @@
 // src/screens/GroupDetailsScreen.tsx
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,6 +23,7 @@ import {
   Chip,
 } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
+import { layout } from '../theme';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
@@ -66,6 +67,22 @@ const GroupDetailsScreen: React.FC = () => {
   const currentUserMember = members.find(m => m.id === currentUser?.id);
   const isAdmin = currentUserMember?.role === 'ADMIN';
 
+  const handleOpenEditGroup = useCallback(() => {
+    navigation.navigate('EditGroup', { groupId });
+  }, [groupId, navigation]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: groupName ?? 'Group Details',
+      headerBackTitle: 'Back',
+      headerRight: isAdmin
+        ? () => (
+            <IconButton icon="pencil" size={20} onPress={handleOpenEditGroup} />
+          )
+        : undefined,
+    });
+  }, [groupName, handleOpenEditGroup, isAdmin, navigation]);
+
   useEffect(() => {
     fetchGroupMembers();
   }, [groupId]);
@@ -82,10 +99,6 @@ const GroupDetailsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleOpenEditGroup = () => {
-    (navigation as any).navigate('EditGroup', { groupId });
   };
 
   const handlePromoteDemote = async (memberId: string, currentRole: string) => {
@@ -350,25 +363,6 @@ const GroupDetailsScreen: React.FC = () => {
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <IconButton
-            icon="arrow-left"
-            size={24}
-            onPress={() => navigation.goBack()}
-          />
-          <Text variant="titleLarge" style={{ color: colors.text, flex: 1 }}>
-            Group Details
-          </Text>
-          {isAdmin && (
-            <IconButton
-              icon="pencil"
-              size={24}
-              onPress={handleOpenEditGroup}
-            />
-          )}
-        </View>
-
         {/* Group Info */}
         <View style={styles.groupSection}>
           <UserAvatar
@@ -524,12 +518,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 32,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
   },
   groupSection: {
     alignItems: 'center',

@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, SafeAreaView } from 'react-native';
 import { Text, Searchbar, FAB, Divider, Portal, Dialog, Button, List } from 'react-native-paper';
 import { useTheme } from '../theme/ThemeContext';
+import { layout, spacing } from '../theme';
 import { useNavigation } from '@react-navigation/native';
 import ChatListItem, { Chat } from '../components/ChatListItem';
 import { useChats } from '../hooks/useChats';
@@ -174,8 +175,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 30,
+    paddingHorizontal: layout.header.paddingHorizontal,
+    paddingVertical: layout.header.paddingVertical,
+    paddingTop: layout.header.paddingVertical + spacing.md,
   },
   title: {
     fontWeight: 'bold',
